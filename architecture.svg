@@ -1,0 +1,104 @@
+<svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="10" flood-color="rgba(0,0,0,0.28)"/>
+    </filter>
+    <radialGradient id="blueGrad" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#6AAEE0"/>
+      <stop offset="100%" stop-color="#3A78BE"/>
+    </radialGradient>
+    <radialGradient id="greenGrad" cx="50%" cy="70%" r="70%">
+      <stop offset="0%" stop-color="#6FCC5A"/>
+      <stop offset="100%" stop-color="#4A9E35"/>
+    </radialGradient>
+    <radialGradient id="purpleGrad" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#8B65BA"/>
+      <stop offset="100%" stop-color="#5E3A9A"/>
+    </radialGradient>
+    <radialGradient id="domainGrad" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#7050B8"/>
+      <stop offset="100%" stop-color="#4A2E90"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ── Outer ring: green bottom ── -->
+  <circle cx="250" cy="250" r="230" fill="url(#greenGrad)" filter="url(#shadow)"/>
+
+  <!-- ── Outer ring: blue top semicircle ── -->
+  <!-- Arc from (20,250) clockwise through top to (480,250) -->
+  <path d="M 20,250 A 230,230 0 0 1 480,250 Z" fill="url(#blueGrad)"/>
+
+  <!-- Outer border -->
+  <circle cx="250" cy="250" r="230" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="2.5"/>
+
+  <!-- ── Application ring ── -->
+  <circle cx="250" cy="250" r="155" fill="url(#purpleGrad)"/>
+
+  <!-- ── Domain circle ── -->
+  <circle cx="250" cy="250" r="75" fill="url(#domainGrad)"/>
+  <circle cx="250" cy="250" r="75" fill="none" stroke="rgba(255,255,255,0.80)" stroke-width="2.5"/>
+
+  <!-- ═══════════════════ LABELS ═══════════════════ -->
+
+  <!-- Presentation (centered in top blue zone: y=20..95, mid=57) -->
+  <text x="250" y="57"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="white" font-size="25" font-weight="700"
+        font-family="'Segoe UI', Arial, Helvetica, sans-serif"
+        letter-spacing="0.5">Presentation</text>
+
+  <!-- Application (centered in top app zone: y=95..175, mid=135) -->
+  <text x="250" y="132"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="white" font-size="23" font-weight="700"
+        font-family="'Segoe UI', Arial, Helvetica, sans-serif"
+        letter-spacing="0.5">Application</text>
+
+  <!-- Domain (center of domain circle) -->
+  <text x="250" y="250"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="white" font-size="22" font-weight="700"
+        font-family="'Segoe UI', Arial, Helvetica, sans-serif"
+        letter-spacing="0.5">Domain</text>
+
+  <!-- Infrastructure (centered in bottom green zone: y=405..480, mid=442) -->
+  <text x="250" y="445"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="white" font-size="25" font-weight="700"
+        font-family="'Segoe UI', Arial, Helvetica, sans-serif"
+        letter-spacing="0.5">Infrastructure</text>
+
+  <!-- ═══════════════════ ARROWS ═══════════════════ -->
+  <!--
+      Block-arrow polygon (pointing DOWN):
+        shaft top-left / top-right
+        shaft bottom-left / bottom-right
+        head left-wing / right-wing
+        tip
+      shaft half-width = 8  |  head half-width = 16  |  head height = 15
+  -->
+
+  <!-- Arrow 1 ▼  Presentation → Application  (y 74 → 120) -->
+  <polygon
+    points="242,74  258,74
+            258,106  266,106
+            250,120
+            234,106  242,106"
+    fill="#ABABAB"/>
+
+  <!-- Arrow 2 ▼  Application → Domain  (y 148 → 186) -->
+  <polygon
+    points="242,148  258,148
+            258,173  266,173
+            250,186
+            234,173  242,173"
+    fill="#ABABAB"/>
+
+  <!-- Arrow 3 ▲  Infrastructure → Application  (tip y 396, base y 434) -->
+  <polygon
+    points="242,434  258,434
+            258,410  266,410
+            250,396
+            234,410  242,410"
+    fill="#ABABAB"/>
+</svg>
