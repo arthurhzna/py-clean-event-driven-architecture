@@ -1,9 +1,8 @@
-from domain.interface.tx import (
-    Tx,
-)
-
 from domain.entities.device import (
     Device,
+)
+from domain.interface.persistence.tx import (
+    Tx,
 )
 from domain.interface.repositories.device_repository import (
     DeviceRepository,

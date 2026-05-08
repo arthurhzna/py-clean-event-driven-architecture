@@ -4,6 +4,9 @@ from application.usecase.create_order_usecase import (
 from application.usecase.register_device_usecase import (
     RegisterDeviceUseCase,
 )
+from application.usecase.send_device_online_usecase import (
+    SendDeviceOnlineUseCase,
+)
 from domain.interface.repositories.device_repository import (
     DeviceRepository,
 )
@@ -12,9 +15,6 @@ from domain.services.pricing_service import (
 )
 from infrastructure.bootstrap.container import (
     ApplicationContainer,
-)
-from infrastructure.runner.device_runtime_runner import (
-    SendDeviceOnlineUseCase,
 )
 
 
