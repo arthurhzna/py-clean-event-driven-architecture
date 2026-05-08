@@ -1,6 +1,3 @@
-# domain/services/pricing_service.py
-
-
 class PricingService:
     def calculate_total(
         self,

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
+from application.usecase.register_device_usecase import (
+    RegisterDeviceUseCase,
+)
+from presentation.messaging.mqtt.handlers.register_device_message_handler import (
+    RegisterDeviceMessageHandler,
+)
 from presentation.messaging.router import (
     MessageRouter,
 )
 
-from presentation.messaging.mqtt.handlers import (
-    RegisterDeviceMessageHandler,
-)
-
-from application.usecase.register_device_usecase import (
-    RegisterDeviceUseCase,
-)
 
 def configure_message_router(
     router: MessageRouter,

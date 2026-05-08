@@ -13,7 +13,29 @@ The domain layer should remain pure and focused only on business concepts and ru
 
 ---
 
-# entities/
+## File Tree
+
+```
+domain/
+├── entities/
+├── enums/
+├── events/
+│   └── device_online_event.py
+├── exceptions/
+├── interface/
+│   ├── messaging/
+│   │   └── event_bus.py
+│   └── repositories/
+│       └── device_repository.py
+├── policies/
+├── services/
+│   └── pricing_service.py
+└── value_objects/
+```
+
+---
+
+## entities/
 
 Represents domain objects that have unique identity and lifecycle.
 
@@ -30,7 +52,7 @@ Characteristics:
 
 ---
 
-# value_objects/
+## value_objects/
 
 Represents domain concepts without identity.
 
@@ -47,7 +69,7 @@ Characteristics:
 
 ---
 
-# services/
+## services/
 
 Contains domain logic that does not naturally belong to entities or value objects.
 
@@ -63,7 +85,7 @@ Characteristics:
 
 ---
 
-# policies/
+## policies/
 
 Contains business rules and decision-making logic.
 
@@ -80,29 +102,48 @@ Characteristics:
 
 ---
 
-# repositories/
+## interface/
+
+Defines abstract contracts (interfaces) that the domain exposes to outer layers.  
+Concrete implementations live in the **infrastructure** layer.
+
+Separating interfaces into their own folder makes it explicit that the domain
+owns the contract, not the implementation.
+
+### interface/repositories/
 
 Defines abstraction interfaces for data persistence.
 
 Examples:
-- UserRepository
-- OrderRepository
-- DeviceRepository
+- `DeviceRepository`
+- `UserRepository`
+- `OrderRepository`
 
 Purpose:
 - prevents the domain layer from depending directly on databases
 - concrete implementations belong to the infrastructure layer
 
+### interface/messaging/
+
+Defines abstraction interfaces for event publishing and subscribing.
+
+Examples:
+- `BaseEventBus` — abstract `publish` and `subscribe` contracts
+
+Purpose:
+- decouples domain events from specific message brokers (Kafka, RabbitMQ, etc.)
+- concrete implementations (e.g. `KafkaEventBus`) live in infrastructure
+
 ---
 
-# events/
+## events/
 
 Represents important events that occur inside the domain.
 
 Examples:
-- UserCreatedEvent
-- OrderCompletedEvent
-- DeviceOnlineEvent
+- `DeviceOnlineEvent`
+- `UserCreatedEvent`
+- `OrderCompletedEvent`
 
 Purpose:
 - communication between system components
@@ -111,7 +152,7 @@ Purpose:
 
 ---
 
-# enums/
+## enums/
 
 Contains domain constants with a limited set of values.
 
@@ -126,7 +167,7 @@ Characteristics:
 
 ---
 
-# exceptions/
+## exceptions/
 
 Contains custom domain-specific exceptions.
 

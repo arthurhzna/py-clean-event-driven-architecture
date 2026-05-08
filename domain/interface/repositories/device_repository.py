@@ -1,26 +1,45 @@
-from abc import ABC, abstractmethod
-from typing import Optional
+from abc import (
+    ABC,
+    abstractmethod,
+)
+
+from domain.entities.device import (
+    Device,
+)
+from domain.interface.database.tx import (
+    Tx,
+)
 
 
 class DeviceRepository(ABC):
-
     @abstractmethod
     def save(
         self,
-        device_id: int,
+        tx: Tx,
+        device: Device,
     ) -> None:
         pass
 
     @abstractmethod
     def get_by_id(
         self,
+        tx: Tx,
         device_id: int,
-    ) -> Optional[dict]:
+    ) -> Device | None:
         pass
 
     @abstractmethod
     def exists(
         self,
+        tx: Tx,
         device_id: int,
     ) -> bool:
+        pass
+
+    @abstractmethod
+    def delete(
+        self,
+        tx: Tx,
+        device_id: int,
+    ) -> None:
         pass
