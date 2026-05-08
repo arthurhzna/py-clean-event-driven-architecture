@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 from psycopg2.pool import (
@@ -17,6 +19,8 @@ class Database:
         user: str,
         password: str,
         database: str,
+        min_conn: int = 2,
+        max_conn: int = 10,
     ) -> None:
 
         self.host = host
@@ -25,6 +29,9 @@ class Database:
         self.password = password
         self.database = database
 
+        self.min_conn = min_conn
+        self.max_conn = max_conn
+
         self.url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
     def connect(
@@ -32,8 +39,8 @@ class Database:
     ) -> ThreadedConnectionPool:
 
         return ThreadedConnectionPool(
-            minconn=2,
-            maxconn=10,
+            minconn=self.min_conn,
+            maxconn=self.max_conn,
             host=self.host,
             port=self.port,
             user=self.user,

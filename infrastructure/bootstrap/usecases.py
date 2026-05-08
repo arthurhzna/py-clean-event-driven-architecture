@@ -13,6 +13,9 @@ from domain.services.pricing_service import (
 from infrastructure.bootstrap.container import (
     ApplicationContainer,
 )
+from infrastructure.runner.device_runtime_runner import (
+    SendDeviceOnlineUseCase,
+)
 
 
 def build_create_order_usecase(
@@ -33,4 +36,13 @@ def build_register_device_usecase(
         datastore=container.datastore,
         state_manager=container.state_manager,
         device_repository=device_repository,
+    )
+
+
+def build_send_device_online_usecase(
+    container: ApplicationContainer,
+) -> SendDeviceOnlineUseCase:
+
+    return SendDeviceOnlineUseCase(
+        event_bus=container.event_bus,
     )

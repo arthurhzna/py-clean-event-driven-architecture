@@ -1,3 +1,6 @@
+from infrastructure.config.database import (
+    DatabaseConfig,
+)
 from infrastructure.persistence.database.database import (
     Database,
 )
@@ -6,14 +9,18 @@ from infrastructure.persistence.database.datastore import (
 )
 
 
-def init_database() -> DataStore:
+def init_database(
+    config: DatabaseConfig,
+) -> DataStore:
 
     db = Database(
-        host="localhost",
-        port=5432,
-        user="postgres",
-        password="postgres",
-        database="mydb",
+        host=config.host,
+        port=config.port,
+        user=config.user,
+        password=config.password,
+        database=config.database,
+        min_conn=config.min_conn,
+        max_conn=config.max_conn,
     )
 
     db.migrate()
