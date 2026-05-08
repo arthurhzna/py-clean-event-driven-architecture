@@ -1,16 +1,21 @@
-from domain.events import (
+from domain.events.device_online_event import (
     DeviceOnlineEvent,
 )
-from domain.interface.messaging.event_bus import BaseEventBus
-from infrastructure.event_handlers.redis_publish_handler import (
-    MQTTPublishHandler,
+from infrastructure.bootstrap.container import (
+    ApplicationContainer,
+)
+from infrastructure.event_handlers.mqtt_send_device_online_handler import (
+    MQTTSendDeviceOnlineHandler,
 )
 
 
 def register_events(
-    event_bus: BaseEventBus,
+    container: ApplicationContainer,
 ) -> None:
-    event_bus.subscribe(
+
+    container.event_bus.subscribe(
         DeviceOnlineEvent,
-        MQTTPublishHandler(),
+        MQTTSendDeviceOnlineHandler(
+            container.mqtt_client,
+        ),
     )

@@ -1,5 +1,3 @@
-# infrastructure/bootstrap/services.py
-
 from domain.services.pricing_service import (
     PricingService,
 )

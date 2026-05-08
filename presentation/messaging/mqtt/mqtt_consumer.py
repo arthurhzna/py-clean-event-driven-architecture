@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 MessageHandler = Callable[[str, bytes], None]
 
 
-@dataclass(slots=True)
+@dataclass
 class MqttConsumer:
     on_message: MessageHandler
 

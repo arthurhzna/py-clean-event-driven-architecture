@@ -1,9 +1,3 @@
-from application.interface.persistence.datastore import (
-    DataStore,
-)
-from application.state.state_manager import (
-    StateManager,
-)
 from application.usecase.create_order_usecase import (
     CreateOrderUseCase,
 )
@@ -15,6 +9,9 @@ from domain.interface.repositories.device_repository import (
 )
 from domain.services.pricing_service import (
     PricingService,
+)
+from infrastructure.bootstrap.container import (
+    ApplicationContainer,
 )
 
 
@@ -28,13 +25,12 @@ def build_create_order_usecase(
 
 
 def build_register_device_usecase(
-    datastore: DataStore,
-    state_manager: StateManager,
+    container: ApplicationContainer,
     device_repository: DeviceRepository,
 ) -> RegisterDeviceUseCase:
 
     return RegisterDeviceUseCase(
-        datastore=datastore,
-        state_manager=state_manager,
+        datastore=container.datastore,
+        state_manager=container.state_manager,
         device_repository=device_repository,
     )

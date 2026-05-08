@@ -23,7 +23,7 @@ def _parse_broker_url(url: str) -> tuple[str, int, bool]:
     return host, port, use_tls
 
 
-@dataclass(slots=True)
+@dataclass
 class MqttClient:
     broker_url: str
     on_connect: Callable[..., Any] | None = None

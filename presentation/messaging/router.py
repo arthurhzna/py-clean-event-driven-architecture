@@ -7,7 +7,7 @@ from typing import Any
 RouteHandler = Callable[..., Any]
 
 
-@dataclass(slots=True)
+@dataclass
 class MessageRouter:
     _handlers: dict[str, RouteHandler] = field(default_factory=dict)
 
