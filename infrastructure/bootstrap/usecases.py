@@ -1,6 +1,6 @@
 # infrastructure/bootstrap/usecases.py
 
-from application.usecases.create_order_usecase import (
+from application.usecases import (
     CreateOrderUseCase,
 )
 
