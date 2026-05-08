@@ -1,5 +1,3 @@
-# application/usecases/create_order_usecase.py
-
 from domain.services.pricing_service import (
     PricingService,
 )
