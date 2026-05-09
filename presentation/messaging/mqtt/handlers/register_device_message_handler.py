@@ -1,4 +1,10 @@
+from __future__ import annotations
+
 import json
+
+from collections.abc import (
+    Callable,
+)
 
 from application.usecase.register_device_usecase import (
     RegisterDeviceUseCase,
@@ -8,10 +14,15 @@ from application.usecase.register_device_usecase import (
 class RegisterDeviceMessageHandler:
     def __init__(
         self,
-        register_device_usecase: RegisterDeviceUseCase,
+        create_usecase: Callable[
+            [],
+            RegisterDeviceUseCase,
+        ],
     ) -> None:
 
-        self._register_device_usecase = register_device_usecase
+        self._create_usecase = (
+            create_usecase
+        )
 
     def __call__(
         self,
@@ -27,6 +38,10 @@ class RegisterDeviceMessageHandler:
             data["device_id"],
         )
 
-        self._register_device_usecase.execute(
+        usecase = (
+            self._create_usecase()
+        )
+
+        usecase.execute(
             device_id=device_id,
         )

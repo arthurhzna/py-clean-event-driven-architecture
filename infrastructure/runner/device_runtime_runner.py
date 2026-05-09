@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import time
 
+from collections.abc import (
+    Callable,
+)
+
 from application.usecase.send_device_online_usecase import (
     SendDeviceOnlineUseCase,
 )
@@ -10,22 +14,37 @@ from application.usecase.send_device_online_usecase import (
 class DeviceRuntimeRunner:
     def __init__(
         self,
-        send_device_online_usecase: SendDeviceOnlineUseCase,
+        create_usecase: Callable[
+            [],
+            SendDeviceOnlineUseCase,
+        ],
         device_id: str,
         interval_seconds: int = 5,
     ) -> None:
 
-        self._send_device_online_usecase = send_device_online_usecase
+        self._create_usecase = (
+            create_usecase
+        )
+
         self._device_id = device_id
-        self._interval_seconds = interval_seconds
+
+        self._interval_seconds = (
+            interval_seconds
+        )
 
     def run(
         self,
     ) -> None:
 
         while True:
+
             try:
-                self._send_device_online_usecase.execute(
+
+                usecase = (
+                    self._create_usecase()
+                )
+
+                usecase.execute(
                     device_id=self._device_id,
                 )
 
