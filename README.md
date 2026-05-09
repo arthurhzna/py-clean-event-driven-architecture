@@ -3,359 +3,617 @@
 </p>
 
 # Python Clean Event-Driven Architecture
+
+Template Python untuk aplikasi event-driven dengan Clean Architecture, MQTT inbound/outbound, message router, event bus, background thread runner, dan transaksi database berbasis Unit of Work.
+
 ---
 
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
-- [Flow 1 — MQTT Inbound → Router → Use Case](#flow-1--mqtt-inbound--router--use-case)
-- [Flow 2 — while True Runner → Event Bus → MQTT Outbound](#flow-2--while-true-runner--event-bus--mqtt-outbound)
-- [Flow 3 — Use Case → Interface → Infrastructure (Repository + Tx)](#flow-3--use-case--interface--infrastructure-repository--tx)
+- [Runtime Overview](#runtime-overview)
+- [Flow 1 - MQTT Inbound to Router to Use Case](#flow-1---mqtt-inbound-to-router-to-use-case)
+- [Flow 2 - Thread Runner to Event Bus to MQTT Outbound](#flow-2---thread-runner-to-event-bus-to-mqtt-outbound)
+- [Flow 3 - Unit of Work Transaction in Infrastructure](#flow-3---unit-of-work-transaction-in-infrastructure)
+- [Message Router](#message-router)
+- [Event Bus](#event-bus)
+- [MQTT Client](#mqtt-client)
+- [Bootstrap Composition Root](#bootstrap-composition-root)
 - [Dependency Rules](#dependency-rules)
-- [Bootstrap — Composition Root](#bootstrap--composition-root)
 - [Project Structure](#project-structure)
 
 ---
 
 ## Architecture Overview
 
-The system is composed of four strict layers.  
-**Dependencies always point inward — outer layers know about inner layers, never the reverse.**
+The system is split into four layers. Dependencies point inward: outer layers can know inner layers, but inner layers never know outer layers.
 
 ```
 ┌─────────────────────────────────────────────┐
-│              Presentation                   │  MQTT handlers, message router
+│              Presentation                   │  Message router, MQTT handlers
 ├─────────────────────────────────────────────┤
 │              Application                    │  Use cases, state manager, interfaces
 ├─────────────────────────────────────────────┤
-│               Domain                        │  Entities, events, repository contracts, Tx protocol
+│               Domain                        │  Entities, events, repository contracts
 ├─────────────────────────────────────────────┤
-│            Infrastructure                   │  Postgres, MQTT client, event bus, runners
+│            Infrastructure                   │  Postgres, MQTT client, event bus, runner
 └─────────────────────────────────────────────┘
 ```
 
-There are two main runtime loops running in parallel:
+The important idea:
 
-| Loop | Purpose |
-|------|---------|
-| **MQTT listener** | Receives inbound messages from the broker, routes to use cases |
-| **`while True` runner** | Periodically publishes device heartbeat via event bus |
+```txt
+Application code depends on abstractions.
+Infrastructure code implements those abstractions.
+Bootstrap wires everything together.
+```
+
+Example:
+
+```txt
+RegisterDeviceUseCase
+  depends on UnitOfWork interface + DeviceRepository interface
+
+PostgresUnitOfWork
+  implements UnitOfWork using psycopg2 connection pool
+
+PostgresDeviceRepository
+  implements DeviceRepository using SQL
+```
 
 ---
 
-## Flow 1 — MQTT Inbound → Router → Use Case
+## Runtime Overview
 
-When a device sends a registration message to the broker:
+There are two main runtime paths:
 
-```
-MQTT Broker  (external)
-     │
-     │  topic: "camera/register"
-     │  payload: {"device_id": 42}
-     ▼
-MqttClient.on_message(topic, payload)        ← infrastructure/messaging/mqtt/mqtt_client.py
-     │
-     │  callback wired in bootstrap
-     ▼
-MessageRouter.dispatch(topic, payload)       ← presentation/messaging/router.py
-     │
-     │  looks up handler by topic
-     ▼
-RegisterDeviceMessageHandler.__call__()      ← presentation/messaging/mqtt/handlers/
-     │  parses JSON payload
-     │  extracts device_id: int
-     ▼
-RegisterDeviceUseCase.execute(device_id)     ← application/usecase/
-     │
-     │  wraps in atomic transaction
-     ▼
-DataStore.atomic(operation)                  ← application interface → infra impl
-     │
-     ├─► StateManager.update_device_registration(True)
-     │
-     └─► DeviceRepository.save(tx, device)   ← domain interface
-               │
-               ▼
-         PostgresDeviceRepository.save()     ← infrastructure/persistence/repositories/
-               │
-               ▼
-         tx.execute(INSERT INTO device ...)  ← infrastructure/persistence/database/tx.py
-               │
-               ▼
-         PostgreSQL Database
+| Runtime path | Purpose |
+|--------------|---------|
+| MQTT listener | Receives broker messages and dispatches them to use cases |
+| Thread runner | Runs a periodic loop that publishes device-online events |
+
+At startup:
+
+```txt
+main.py
+  ├─ build_application()
+  ├─ starts DeviceRuntimeRunner.run() in a daemon Thread
+  └─ keeps the process alive
 ```
 
-### Key files
+The MQTT network loop is handled by `paho-mqtt` through `MqttClient.connect()`, which calls `client.loop_start()`.
+
+---
+
+## Flow 1 - MQTT Inbound to Router to Use Case
+
+When the broker receives a device registration message:
+
+```txt
+MQTT Broker
+     │
+     │ topic: "device/register"
+     │ payload: {"device_id": 42}
+     ▼
+MqttClient._cb_message()
+     │
+     │ converts raw paho message into (topic: str, payload: bytes)
+     ▼
+MqttClient.on_message(topic, payload)
+     │
+     │ wired in bootstrap:
+     │ mqtt_client.on_message = router.dispatch
+     ▼
+MessageRouter.dispatch(topic, payload)
+     │
+     │ finds handler by topic key
+     ▼
+RegisterDeviceMessageHandler.__call__(topic, payload)
+     │
+     │ parses JSON payload
+     │ creates a fresh use case through factory
+     ▼
+RegisterDeviceUseCase.execute(device_id)
+     │
+     │ opens UnitOfWork transaction
+     ▼
+PostgresUnitOfWork.__enter__()
+     │
+     │ borrows connection from ThreadedConnectionPool
+     ▼
+PostgresDeviceRepository.save(device)
+     │
+     │ executes SQL using cursor from UnitOfWork connection
+     ▼
+uow.commit()
+     │
+     │ commits PostgreSQL transaction
+     ▼
+StateManager.update_device_registration(True)
+```
+
+Key files:
 
 | File | Role |
 |------|------|
-| `infrastructure/messaging/mqtt/mqtt_client.py` | Connects to broker, receives raw bytes |
-| `presentation/messaging/router.py` | Maps topic string → handler callable |
-| `presentation/messaging/mqtt/handlers/register_device_message_handler.py` | Parses payload, calls use case |
-| `application/usecase/register_device_usecase.py` | Business logic, owns the transaction |
-| `infrastructure/persistence/database/datastore.py` | Manages connection pool + commit/rollback |
-| `infrastructure/persistence/repositories/device/postgres_device_repository.py` | SQL implementation |
+| `infrastructure/messaging/mqtt/mqtt_client.py` | Paho MQTT wrapper; receives raw broker messages |
+| `presentation/messaging/router.py` | Maps topic string to handler callable |
+| `infrastructure/bootstrap/message_router.py` | Registers topic handlers |
+| `presentation/messaging/mqtt/handlers/register_device_message_handler.py` | Parses MQTT payload and calls use case |
+| `application/usecase/register_device_usecase.py` | Application business flow for device registration |
+| `application/interface/persistence/unit_of_work.py` | UnitOfWork interface used by use cases |
+| `infrastructure/persistence/database/postgres_unit_of_work.py` | PostgreSQL UnitOfWork implementation |
+| `infrastructure/persistence/repositories/device/postgres_device_repository.py` | SQL implementation of device repository |
 
-### How MessageRouter works
+Router example:
 
-```
+```python
 router = MessageRouter()
 
-router.register("camera/register", RegisterDeviceMessageHandler(...))
+router.register(
+    "device/register",
+    RegisterDeviceMessageHandler(create_usecase=...)
+)
 
-# when MQTT message arrives:
-router.dispatch("camera/register", b'{"device_id": 42}')
-# → finds handler by topic key → calls handler(topic, payload)
+router.dispatch("device/register", b'{"device_id": 42}')
+```
+
+The router calls the handler as:
+
+```python
+handler(topic, payload)
 ```
 
 ---
 
-## Flow 2 — while True Runner → Event Bus → MQTT Outbound
+## Flow 2 - Thread Runner to Event Bus to MQTT Outbound
 
-Every 5 seconds, the device broadcasts that it is online:
+The app also has a background runtime loop. It periodically publishes a device-online event.
 
-```
-DeviceRuntimeRunner.run()                    ← infrastructure/runner/device_runtime_runner.py
+```txt
+main.py
      │
-     │  while True: sleep(5)
+     │ starts daemon thread
      ▼
-SendDeviceOnlineUseCase.execute(device_id)   ← application/usecase/
+DeviceRuntimeRunner.run()
      │
-     │  creates domain event
+     │ while True:
+     │   create fresh SendDeviceOnlineUseCase
+     │   execute(device_id)
+     │   sleep(interval_seconds)
      ▼
-DeviceOnlineEvent(device_id, timestamp)      ← domain/events/device_online_event.py
+SendDeviceOnlineUseCase.execute(device_id)
+     │
+     │ creates domain event
+     ▼
+DeviceOnlineEvent(device_id, timestamp)
      │
      ▼
-BaseEventBus.publish(event)                  ← domain/interface/messaging/event_bus.py
+BaseEventBus.publish(event)
      │
-     │  concrete impl: InMemoryEventBus
+     │ concrete implementation: InMemoryEventBus
      ▼
-InMemoryEventBus                             ← infrastructure/event_bus/in_memory_event_bus.py
+InMemoryEventBus.publish(event)
      │
-     │  looks up subscribed handlers for DeviceOnlineEvent
+     │ finds handlers subscribed for DeviceOnlineEvent
      ▼
-MQTTSendDeviceOnlineHandler.__call__(event)  ← infrastructure/event_handlers/
+MQTTSendDeviceOnlineHandler.__call__(event)
      │
-     │  serializes event → DeviceOnlineMessage
+     │ converts event into DeviceOnlineMessage
      ▼
-MqttClient.publish(                          ← infrastructure/messaging/mqtt/mqtt_client.py
+MqttClient.publish(
     topic="device/online",
     payload=message.to_bytes()
 )
      │
      ▼
-MQTT Broker  (external)
+MQTT Broker
 ```
 
-### Key files
+Key files:
 
 | File | Role |
 |------|------|
-| `infrastructure/runner/device_runtime_runner.py` | `while True` loop, calls use case on interval |
-| `application/usecase/send_device_online_usecase.py` | Creates event, publishes to event bus |
-| `domain/events/device_online_event.py` | Pure domain event, no dependencies |
-| `domain/interface/messaging/event_bus.py` | Abstract `BaseEventBus` — `publish` + `subscribe` |
-| `infrastructure/event_bus/in_memory_event_bus.py` | Concrete in-process event bus |
-| `infrastructure/event_handlers/mqtt_send_device_online_handler.py` | Subscribes to event, sends via MQTT |
+| `main.py` | Starts app and daemon thread |
+| `infrastructure/runner/device_runtime_runner.py` | Periodic `while True` runner |
+| `application/usecase/send_device_online_usecase.py` | Creates and publishes `DeviceOnlineEvent` |
+| `domain/events/device_online_event.py` | Pure domain event |
+| `domain/interface/messaging/event_bus.py` | Event bus abstraction |
+| `infrastructure/event_bus/in_memory_event_bus.py` | In-process event bus implementation |
+| `infrastructure/bootstrap/event_bus.py` | Subscribes event handlers at startup |
+| `infrastructure/event_handlers/mqtt_send_device_online_handler.py` | Converts domain event to MQTT publish |
 | `infrastructure/messaging/mqtt/messages/device_online_message.py` | MQTT payload DTO |
 
-### How EventBus works
+The use case only knows `BaseEventBus`. It does not know MQTT exists.
 
-```
-# Subscribe (done once at startup in bootstrap/event_bus.py)
-event_bus.subscribe(DeviceOnlineEvent, MQTTSendDeviceOnlineHandler(mqtt_client))
+That is the clean part:
 
-# Publish (done by use case at runtime)
-event_bus.publish(DeviceOnlineEvent(device_id="cam-01", timestamp=...))
-
-# InMemoryEventBus internally:
-# handlers = self._handlers[DeviceOnlineEvent]
-# for handler in handlers: handler(event)
+```txt
+SendDeviceOnlineUseCase -> BaseEventBus
+InMemoryEventBus        -> handler list
+MQTT handler            -> MqttClient.publish()
 ```
 
-The **use case only knows `BaseEventBus`** — it never knows MQTT exists.  
-Swapping MQTT for Kafka only requires changing the handler in bootstrap.
+To swap MQTT outbound for Kafka outbound, replace the subscribed event handler in bootstrap. The use case stays untouched.
 
 ---
 
-## Flow 3 — Use Case → Interface → Infrastructure (Repository + Tx)
+## Flow 3 - Unit of Work Transaction in Infrastructure
 
-This shows how the use case interacts with the database without ever depending on Postgres directly.
+This is the important transaction design in the current template.
 
-### Layer contracts
+The use case owns the application flow, but infrastructure owns the database mechanics.
 
+```txt
+application/interface/persistence/unit_of_work.py
+    UnitOfWork ABC
+        ├─ __enter__()
+        ├─ __exit__()
+        ├─ commit()
+        └─ rollback()
+
+infrastructure/persistence/database/postgres_unit_of_work.py
+    PostgresUnitOfWork
+        ├─ borrows connection from pool
+        ├─ exposes active connection to repositories
+        ├─ commits on success when use case calls commit()
+        ├─ rolls back on exception
+        └─ returns connection to pool
 ```
-domain/interface/persistence/tx.py           ← Tx Protocol (execute, fetchone)
-domain/interface/repositories/               ← DeviceRepository ABC (save, get_by_id, ...)
-application/interface/persistence/           ← DataStore ABC (atomic, query)
-        ↑ implemented by
-infrastructure/persistence/database/tx.py    ← Tx wraps psycopg2 cursor
-infrastructure/persistence/database/         ← DataStore manages connection pool
-infrastructure/persistence/repositories/     ← PostgresDeviceRepository
-```
 
-### Transaction flow inside `RegisterDeviceUseCase`
+Register device transaction:
 
 ```python
-# application/usecase/register_device_usecase.py
-
 def execute(self, device_id: int) -> None:
+    with self._uow as uow:
+        device = Device(
+            device_id=device_id,
+            is_registered=True,
+        )
 
-    def operation(tx: Tx) -> None:            # tx = domain interface, not psycopg2
-        device = Device(device_id=device_id, is_registered=True)
-        self._device_repository.save(tx, device)
-        self._state_manager.update_device_registration(True)
+        self._device_repository.save(device)
 
-    self._datastore.atomic(operation)         # commits on success, rolls back on error
+        uow.commit()
+
+    self._state_manager.update_device_registration(True)
 ```
 
-### What `DataStore.atomic()` does
+What happens under the hood:
 
-```
-DataStore.atomic(operation)
+```txt
+with self._uow as uow
   │
-  ├─ conn = pool.getconn()          # borrow from connection pool
-  ├─ tx = Tx(conn)                  # wrap in Tx (infrastructure impl)
-  ├─ operation(tx)                  # run use case callback
-  ├─ conn.commit()      ✅ success
-  │  conn.rollback()    ❌ exception
-  └─ pool.putconn(conn)             # return to pool
+  ├─ PostgresUnitOfWork.__enter__()
+  │    └─ conn = pool.getconn()
+  │
+  ├─ repository.save(device)
+  │    └─ cursor = uow.connection.cursor()
+  │    └─ cursor.execute(INSERT INTO device ...)
+  │
+  ├─ uow.commit()
+  │    └─ conn.commit()
+  │
+  └─ PostgresUnitOfWork.__exit__()
+       ├─ if exception: conn.rollback()
+       └─ pool.putconn(conn)
 ```
 
-### Why `Tx` lives in domain, not infrastructure
+Why this is clean:
 
+- The application layer depends on `UnitOfWork`, not `psycopg2`.
+- The use case says "this operation is atomic" without knowing how PostgreSQL works.
+- The repository interface does not receive a raw `tx` or cursor parameter.
+- SQL and cursor usage stay inside infrastructure repositories.
+- Connection pooling, commit, rollback, and connection return happen in infrastructure.
+
+Why this is nice for a large project:
+
+```txt
+Use case:
+  controls business flow and transaction boundary
+
+UnitOfWork interface:
+  gives application a stable abstraction
+
+PostgresUnitOfWork:
+  owns concrete database transaction mechanics
+
+Repository:
+  owns SQL details
 ```
-domain/interface/persistence/tx.py
 
-class Tx(Protocol):
-    def execute(self, query: str, params: tuple) -> None: ...
-    def fetchone(self) -> tuple | None: ...
+This is the "keren" part: the transaction is visible at the use-case level as a business boundary, but the ugly database details are hidden in infrastructure.
+
+---
+
+## Message Router
+
+`MessageRouter` is a small presentation component that maps an incoming route/topic to a handler.
+
+```python
+RouteHandler = Callable[[str, bytes], Any]
 ```
 
-- Domain defines **what a transaction looks like** (Protocol = structural typing)
-- Infrastructure `Tx` satisfies it without importing domain
-- Repository receives `tx: Tx` (domain type) — never psycopg2 directly
-- In tests, pass a `FakeTx` that satisfies the same Protocol
+```txt
+MessageRouter
+  ├─ register(route, handler)
+  └─ dispatch(route, payload)
+       ├─ handler = _handlers.get(route)
+       ├─ if missing: ignore
+       └─ handler(route, payload)
+```
+
+Current registration:
+
+```txt
+"device/register" -> RegisterDeviceMessageHandler
+```
+
+The router does not know MQTT, JSON, database, or use-case internals. It only knows topic-like routes and callables.
+
+---
+
+## Event Bus
+
+The event bus decouples application use cases from side effects.
+
+```txt
+BaseEventBus
+  ├─ publish(event)
+  └─ subscribe(event_type, handler)
+```
+
+Current implementation:
+
+```txt
+InMemoryEventBus
+  └─ dict[type, list[handler]]
+```
+
+Startup subscription:
+
+```python
+event_bus.subscribe(
+    DeviceOnlineEvent,
+    MQTTSendDeviceOnlineHandler(mqtt_client),
+)
+```
+
+Runtime publish:
+
+```python
+event_bus.publish(
+    DeviceOnlineEvent(device_id=device_id, timestamp=...)
+)
+```
+
+This keeps the use case clean:
+
+```txt
+Use case publishes a domain event.
+Infrastructure decides what side effect happens.
+```
+
+---
+
+## MQTT Client
+
+`MqttClient` is an infrastructure wrapper around `paho-mqtt`.
+
+Responsibilities:
+
+- Create and configure the paho client.
+- Apply username/password when provided.
+- Enable TLS when configured.
+- Start the paho network loop using `loop_start()`.
+- Convert paho messages into `(topic: str, payload: bytes)`.
+- Store subscriptions as `(topic, qos)` pairs.
+- Re-subscribe after connect.
+- Publish messages with a lock to keep outbound publishing thread-safe.
+
+Inbound callback:
+
+```txt
+paho on_message
+  -> MqttClient._cb_message
+  -> self.on_message(topic, payload)
+  -> MessageRouter.dispatch(topic, payload)
+```
+
+Outbound call:
+
+```txt
+MQTTSendDeviceOnlineHandler
+  -> MqttClient.publish("device/online", payload)
+```
+
+Current subscriptions:
+
+```txt
+device/config   qos=0
+device/register qos=1
+device/publish  qos=1
+```
+
+---
+
+## Bootstrap Composition Root
+
+`infrastructure/bootstrap/application.py` is the composition root. This is the place where concrete infrastructure is allowed to meet application abstractions.
+
+```txt
+build_application()
+  │
+  ├─ load_config()
+  │    ├─ database config
+  │    ├─ mqtt config
+  │    └─ device config
+  │
+  ├─ init_database(config.database)
+  │    └─ returns ThreadedConnectionPool
+  │
+  ├─ StateManager()
+  ├─ InMemoryEventBus()
+  ├─ MqttClient(...)
+  │
+  ├─ ApplicationContainer(
+  │     pool,
+  │     state_manager,
+  │     event_bus,
+  │     mqtt_client,
+  │   )
+  │
+  ├─ register_events(container)
+  │    └─ DeviceOnlineEvent -> MQTTSendDeviceOnlineHandler
+  │
+  ├─ register_message_handlers(...)
+  │    └─ "device/register" -> RegisterDeviceMessageHandler
+  │
+  ├─ mqtt_client.on_message = router.dispatch
+  ├─ mqtt_client.connect()
+  ├─ mqtt_client.subscribe([...])
+  │
+  └─ DeviceRuntimeRunner(
+       create_usecase=lambda: build_send_device_online_usecase(container),
+       device_id=config.device.device_id,
+     )
+```
+
+Use case factories live under:
+
+```txt
+infrastructure/bootstrap/usecase_factories/
+  ├─ scoped_factories.py
+  └─ singleton_factories.py
+```
+
+The scoped factory creates a fresh `PostgresUnitOfWork` for flows that need their own transactional scope.
 
 ---
 
 ## Dependency Rules
 
-```
-Presentation   →  Application  →  Domain
-Infrastructure →  Application  →  Domain
-                                  Domain  → (nothing)
+```txt
+Presentation   -> Application -> Domain
+Infrastructure -> Application -> Domain
+Domain         -> nothing outward
 ```
 
 | Layer | Can import from | Cannot import from |
-|-------|----------------|--------------------|
-| Domain | — | Application, Infrastructure, Presentation |
-| Application | Domain | Infrastructure, Presentation |
-| Infrastructure | Domain, Application | Presentation |
+|-------|-----------------|--------------------|
+| Domain | standard library only / pure domain modules | Application, Infrastructure, Presentation |
+| Application | Domain, application interfaces/state | Infrastructure, Presentation |
+| Infrastructure | Application, Domain | Presentation |
 | Presentation | Application, Domain | Infrastructure |
 
----
-
-## Bootstrap — Composition Root
-
-`infrastructure/bootstrap/application.py` is the **only place** where all layers are wired together.
-
-```
-build_application()
-  │
-  ├── 1. init_database()              → DataStore  (infra)
-  ├── 2. StateManager()               → in-memory state  (application)
-  ├── 3. InMemoryEventBus()           → event bus  (infra)
-  ├── 4. MqttClient(broker_url)       → MQTT connection  (infra)
-  │
-  ├── 5. ApplicationContainer(...)    → holds all shared dependencies
-  │
-  ├── 6. register_events(container)
-  │       └── event_bus.subscribe(DeviceOnlineEvent, MQTTSendDeviceOnlineHandler)
-  │
-  ├── 7. build_device_repository()    → PostgresDeviceRepository
-  │
-  ├── 8. build_register_device_usecase(container, device_repository)
-  │       └── RegisterDeviceUseCase(datastore, state_manager, device_repository)
-  │
-  ├── 9. build_send_device_online_usecase(container)
-  │       └── SendDeviceOnlineUseCase(event_bus)
-  │
-  ├── 10. MessageRouter()
-  │        └── configure_message_router(router, register_device_usecase)
-  │            └── router.register("camera/register", RegisterDeviceMessageHandler)
-  │
-  ├── 11. mqtt_client.on_message = router.dispatch   ← wire MQTT → router
-  │        mqtt_client.connect()
-  │        mqtt_client.subscribe("camera/register")
-  │
-  └── 12. DeviceRuntimeRunner(send_device_online_usecase)
-           └── returns Application(container, mqtt_client, device_runtime_runner)
-```
+Bootstrap is the exception by design: it is the composition root that wires presentation, application, domain abstractions, and infrastructure implementations.
 
 ---
 
 ## Project Structure
 
-```
+```txt
 py-clean-event-driven-architecture/
 │
-├── domain/                                    # innermost — no dependencies
-│   ├── entities/
-│   │   └── device.py                          # Device(device_id, is_registered)
-│   ├── events/
-│   │   └── device_online_event.py             # DeviceOnlineEvent(device_id, timestamp)
-│   └── interface/
-│       ├── messaging/
-│       │   └── event_bus.py                   # BaseEventBus (publish, subscribe)
-│       ├── persistence/
-│       │   └── tx.py                          # Tx Protocol (execute, fetchone)
-│       └── repositories/
-│           └── device_repository.py           # DeviceRepository ABC
+├── main.py
+│   └── builds the app and starts DeviceRuntimeRunner in a daemon thread
 │
-├── application/                               # use cases + application interfaces
+├── domain/
+│   ├── entities/
+│   │   └── device.py
+│   ├── events/
+│   │   └── device_online_event.py
+│   ├── interface/
+│   │   ├── messaging/
+│   │   │   └── event_bus.py
+│   │   └── repositories/
+│   │       └── device_repository.py
+│   └── services/
+│       └── pricing_service.py
+│
+├── application/
 │   ├── interface/
 │   │   └── persistence/
-│   │       └── datastore.py                   # DataStore ABC (atomic, query)
+│   │       └── unit_of_work.py
 │   ├── state/
-│   │   └── state_manager.py                   # thread-safe in-memory state
+│   │   ├── device_state.py
+│   │   ├── screenshot_state.py
+│   │   └── state_manager.py
 │   └── usecase/
-│       ├── register_device_usecase.py         # handles device registration + DB write
-│       └── send_device_online_usecase.py      # publishes DeviceOnlineEvent
+│       ├── create_order_usecase.py
+│       ├── register_device_usecase.py
+│       └── send_device_online_usecase.py
 │
-├── infrastructure/                            # all external concerns
+├── infrastructure/
 │   ├── bootstrap/
-│   │   ├── application.py                     # composition root ← start here
-│   │   ├── container.py                       # ApplicationContainer dataclass
-│   │   ├── database.py                        # init_database() → DataStore
-│   │   ├── event_bus.py                       # register_events(container)
-│   │   ├── message_router.py                  # configure_message_router(...)
-│   │   ├── repository.py                      # build_device_repository()
-│   │   └── usecases.py                        # build_*_usecase() factories
+│   │   ├── application.py
+│   │   ├── container.py
+│   │   ├── database.py
+│   │   ├── event_bus.py
+│   │   ├── message_router.py
+│   │   ├── services.py
+│   │   └── usecase_factories/
+│   │       ├── scoped_factories.py
+│   │       └── singleton_factories.py
+│   ├── config/
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── device.py
+│   │   ├── mqtt.py
+│   │   ├── httpserver.py
+│   │   ├── jwt.py
+│   │   └── logger.py
 │   ├── event_bus/
-│   │   └── in_memory_event_bus.py             # InMemoryEventBus (pub/sub in-process)
+│   │   ├── in_memory_event_bus.py
+│   │   ├── kafka_event_bus.py
+│   │   └── rabbitmq_event_bus.py
 │   ├── event_handlers/
-│   │   └── mqtt_send_device_online_handler.py # DeviceOnlineEvent → MQTT publish
+│   │   └── mqtt_send_device_online_handler.py
 │   ├── messaging/
 │   │   └── mqtt/
-│   │       ├── mqtt_client.py                 # paho-mqtt wrapper
+│   │       ├── mqtt_client.py
 │   │       └── messages/
-│   │           └── device_online_message.py   # MQTT payload DTO
+│   │           └── device_online_message.py
 │   ├── persistence/
 │   │   ├── database/
-│   │   │   ├── database.py                    # Database (pool + migrate)
-│   │   │   ├── datastore.py                   # DataStore (atomic, query)
-│   │   │   └── tx.py                          # Tx wraps psycopg2 cursor
+│   │   │   ├── database.py
+│   │   │   ├── postgres_unit_of_work.py
+│   │   │   └── migrations/
+│   │   │       └── init_schema.py
 │   │   └── repositories/
+│   │       ├── base_repository.py
 │   │       └── device/
 │   │           └── postgres_device_repository.py
 │   └── runner/
-│       └── device_runtime_runner.py           # while True → SendDeviceOnlineUseCase
+│       └── device_runtime_runner.py
 │
-└── presentation/                              # entry points from external world
-    └── messaging/
-        ├── router.py                          # MessageRouter (topic → handler)
-        └── mqtt/
-            └── handlers/
-                └── register_device_message_handler.py  # parse MQTT → call use case
+└── presentation/
+    ├── messaging/
+    │   ├── router.py
+    │   ├── kafka/
+    │   │   └── kafka_consumer.py
+    │   └── mqtt/
+    │       ├── mqtt_consumer.py
+    │       └── handlers/
+    │           └── register_device_message_handler.py
+    └── http/
+        ├── controllers/
+        ├── presenters/
+        ├── requests/
+        ├── responses/
+        └── routes/
 ```
+
+---
+
+## Why This Template Scales
+
+- MQTT inbound is isolated in infrastructure and presentation.
+- Message routing is tiny and replaceable.
+- Use cases stay focused on application behavior.
+- Domain events describe what happened without knowing side effects.
+- Event handlers convert domain events into infrastructure actions.
+- UnitOfWork keeps transaction mechanics in infrastructure.
+- Bootstrap owns object wiring so application code never imports concrete adapters.
+
+This keeps the template clean for a larger project without hiding the runtime flow.

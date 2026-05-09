@@ -68,7 +68,6 @@ def build_application() -> Application:
 
     config = load_config()
 
-    # 1. Infrastructure
     pool = init_database(
         config.database,
     )
@@ -90,8 +89,7 @@ def build_application() -> Application:
 
         use_tls=config.mqtt.use_tls,
     )
-    
-    # 2. Shared container
+
     container = ApplicationContainer(
         pool=pool,
         state_manager=state_manager,
@@ -99,22 +97,18 @@ def build_application() -> Application:
         mqtt_client=mqtt_client,
     )
 
-    # 3. Register domain event handlers
     register_events(
         container,
     )
 
-    # 4. Services
     pricing_service = PricingService()
 
-    # 5. Singleton/stateless usecases
     create_order_usecase = (
         build_create_order_usecase(
             pricing_service=pricing_service,
         )
     )
 
-    # 6. Message router
     router = MessageRouter()
 
     register_message_handlers(
@@ -126,7 +120,6 @@ def build_application() -> Application:
         ),
     )
 
-    # 7. MQTT wiring
     mqtt_client.on_message = (
         router.dispatch
     )
@@ -150,7 +143,6 @@ def build_application() -> Application:
         ]
     )
 
-    # 8. Runtime runners
     device_runtime_runner = (
         DeviceRuntimeRunner(
             create_usecase=(
