@@ -8,6 +8,41 @@ A Python template for event-driven applications with Clean Architecture, MQTT in
 
 ---
 
+# Why Clean Architecture?
+
+As applications grow, business logic often becomes tightly coupled with:
+- databases
+- messaging systems
+- frameworks
+- external services
+- infrastructure code
+
+This makes systems:
+- difficult to test
+- hard to maintain
+- difficult to scale
+- tightly coupled to implementation details
+
+Clean Architecture helps solve this by separating the application into clear layers with explicit responsibilities.
+
+Benefits:
+- independent business logic
+- easier testing
+- lower coupling
+- better maintainability
+- replaceable infrastructure
+- scalable architecture for long-term projects
+
+The goal is to keep the core business rules independent from:
+- databases
+- frameworks
+- transport protocols
+- external systems
+
+This template demonstrates how to structure an event-driven Python application while keeping dependency direction clean and maintainable.
+
+---
+
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
