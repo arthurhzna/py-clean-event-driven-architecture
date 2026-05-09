@@ -1,17 +1,19 @@
+from psycopg2.pool import (
+    ThreadedConnectionPool,
+)
+
 from infrastructure.config.database import (
     DatabaseConfig,
 )
+
 from infrastructure.persistence.database.database import (
     Database,
-)
-from infrastructure.persistence.database.datastore import (
-    DataStore,
 )
 
 
 def init_database(
     config: DatabaseConfig,
-) -> DataStore:
+) -> ThreadedConnectionPool:
 
     db = Database(
         host=config.host,
@@ -25,8 +27,4 @@ def init_database(
 
     db.migrate()
 
-    pool = db.connect()
-
-    return DataStore(
-        pool=pool,
-    )
+    return db.connect()

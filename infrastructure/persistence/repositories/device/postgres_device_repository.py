@@ -1,24 +1,28 @@
+from __future__ import annotations
+
 from domain.entities.device import (
     Device,
 )
-from domain.interface.persistence.tx import (
-    Tx,
-)
+
 from domain.interface.repositories.device_repository import (
     DeviceRepository,
 )
 
+from infrastructure.persistence.repositories.base_repository import (
+    BaseRepository,
+)
+
 
 class PostgresDeviceRepository(
+    BaseRepository,
     DeviceRepository,
 ):
     def save(
         self,
-        tx: Tx,
         device: Device,
     ) -> None:
 
-        tx.execute(
+        self.cursor.execute(
             """
             INSERT INTO device (
                 device_id,
@@ -38,11 +42,10 @@ class PostgresDeviceRepository(
 
     def get_by_id(
         self,
-        tx: Tx,
         device_id: int,
     ) -> Device | None:
 
-        tx.execute(
+        self.cursor.execute(
             """
             SELECT
                 device_id,
@@ -53,7 +56,7 @@ class PostgresDeviceRepository(
             (device_id,),
         )
 
-        row = tx.fetchone()
+        row = self.cursor.fetchone()
 
         if row is None:
             return None
@@ -65,11 +68,10 @@ class PostgresDeviceRepository(
 
     def exists(
         self,
-        tx: Tx,
         device_id: int,
     ) -> bool:
 
-        tx.execute(
+        self.cursor.execute(
             """
             SELECT 1
             FROM device
@@ -78,15 +80,17 @@ class PostgresDeviceRepository(
             (device_id,),
         )
 
-        return tx.fetchone() is not None
+        return (
+            self.cursor.fetchone()
+            is not None
+        )
 
     def delete(
         self,
-        tx: Tx,
         device_id: int,
     ) -> None:
 
-        tx.execute(
+        self.cursor.execute(
             """
             DELETE FROM device
             WHERE device_id = %s

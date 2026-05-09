@@ -59,7 +59,13 @@ def build_application() -> Application:
     config = load_config()
 
     # 1. Infrastructure
-    datastore = init_database(config.database)
+    pool = init_database(
+        config.database,
+    )
+
+    uow = UnitOfWork(
+        pool=pool,
+    )
 
     state_manager = StateManager()
 
@@ -71,7 +77,7 @@ def build_application() -> Application:
 
     # 2. Shared container
     container = ApplicationContainer(
-        datastore=datastore,
+        uow=uow,
         state_manager=state_manager,
         event_bus=event_bus,
         mqtt_client=mqtt_client,

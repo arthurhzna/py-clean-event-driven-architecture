@@ -18,7 +18,7 @@ from infrastructure.messaging.mqtt.mqtt_client import (
 
 @dataclass
 class ApplicationContainer:
-    datastore: DataStore
+    uow: UnitOfWork
     state_manager: StateManager
     event_bus: BaseEventBus
     mqtt_client: MqttClient
