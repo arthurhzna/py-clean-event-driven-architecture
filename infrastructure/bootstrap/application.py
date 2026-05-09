@@ -24,6 +24,10 @@ from infrastructure.bootstrap.message_router import (
     register_message_handlers,
 )
 
+from infrastructure.bootstrap.mqtt import (
+    build_mqtt_client,
+)
+
 from infrastructure.bootstrap.services import (
     PricingService,
 )
@@ -43,10 +47,6 @@ from infrastructure.config.config import (
 
 from infrastructure.event_bus.in_memory_event_bus import (
     InMemoryEventBus,
-)
-
-from infrastructure.messaging.mqtt.mqtt_client import (
-    MqttClient,
 )
 
 from infrastructure.runner.device_runtime_runner import (
@@ -76,18 +76,9 @@ def build_application() -> Application:
 
     event_bus = InMemoryEventBus()
 
-    mqtt_client = MqttClient(
-        broker=config.mqtt.broker,
-        port=config.mqtt.port,
-
-        client_id=(
-            f"cv_client_{config.device.device_id}"
-        ),
-
-        username=config.mqtt.username,
-        password=config.mqtt.password,
-
-        use_tls=config.mqtt.use_tls,
+    mqtt_client = build_mqtt_client(
+        mqtt_config=config.mqtt,
+        device_config=config.device,
     )
 
     container = ApplicationContainer(
