@@ -38,7 +38,7 @@ class RegisterDeviceUseCase:
         device_id: int,
     ) -> None:
 
-        with self._uow:
+        with self._uow as uow:
 
             device = Device(
                 device_id=device_id,
@@ -49,7 +49,7 @@ class RegisterDeviceUseCase:
                 device,
             )
 
-            self._uow.commit()
+            uow.commit()
 
         self._state_manager.update_device_registration(
             True,

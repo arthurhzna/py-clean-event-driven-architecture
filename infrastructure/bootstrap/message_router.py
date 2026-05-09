@@ -26,9 +26,9 @@ def register_message_handlers(
 ) -> None:
 
     router.register(
-        "camera/register",
+        "device/register",
         RegisterDeviceMessageHandler(
-            usecase_factory=(
+            create_usecase=(
                 register_device_usecase_factory
             ),
         ),

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from application.interface.persistence.unit_of_work import (
-    UnitOfWork,
+    UnitOfWork as UnitOfWorkInterface,
 )
 
 
 class UnitOfWork(
-    UnitOfWork,
+    UnitOfWorkInterface,
 ):
     def __init__(
         self,
@@ -14,19 +14,16 @@ class UnitOfWork(
     ) -> None:
 
         self._pool = pool
-
         self._conn = None
 
     @property
-    def connection(
-        self,
-    ):
+    def connection(self):
 
         return self._conn
 
     def __enter__(
         self,
-    ) -> "UnitOfWork":
+    ) -> UnitOfWork:
 
         self._conn = (
             self._pool.getconn()
@@ -34,15 +31,11 @@ class UnitOfWork(
 
         return self
 
-    def commit(
-        self,
-    ) -> None:
+    def commit(self) -> None:
 
         self._conn.commit()
 
-    def rollback(
-        self,
-    ) -> None:
+    def rollback(self) -> None:
 
         self._conn.rollback()
 
