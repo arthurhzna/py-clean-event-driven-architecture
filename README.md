@@ -4,7 +4,7 @@
 
 # Python Clean Event-Driven Architecture
 
-Template Python untuk aplikasi event-driven dengan Clean Architecture, MQTT inbound/outbound, message router, event bus, background thread runner, dan transaksi database berbasis Unit of Work.
+A Python template for event-driven applications with Clean Architecture, MQTT inbound/outbound messaging, a message router, an event bus, a background thread runner, and Unit of Work based database transactions.
 
 ---
 
@@ -322,7 +322,7 @@ Repository:
   owns SQL details
 ```
 
-This is the "keren" part: the transaction is visible at the use-case level as a business boundary, but the ugly database details are hidden in infrastructure.
+This is the powerful part: the transaction is visible at the use-case level as a business boundary, but the database details are hidden in infrastructure.
 
 ---
 
