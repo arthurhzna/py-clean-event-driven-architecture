@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from application.interface.persistence.unit_of_work import (
-    UnitOfWork as UnitOfWorkInterface,
+    UnitOfWork,
 )
 
 
-class UnitOfWork(
-    UnitOfWorkInterface,
+class PostgresUnitOfWork(
+    UnitOfWork,
 ):
     def __init__(
         self,
@@ -23,7 +23,7 @@ class UnitOfWork(
 
     def __enter__(
         self,
-    ) -> UnitOfWork:
+    ) -> PostgresUnitOfWork:
 
         self._conn = (
             self._pool.getconn()
@@ -31,11 +31,15 @@ class UnitOfWork(
 
         return self
 
-    def commit(self) -> None:
+    def commit(
+        self,
+    ) -> None:
 
         self._conn.commit()
 
-    def rollback(self) -> None:
+    def rollback(
+        self,
+    ) -> None:
 
         self._conn.rollback()
 

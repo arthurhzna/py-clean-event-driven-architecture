@@ -18,8 +18,8 @@ from infrastructure.bootstrap.container import (
     ApplicationContainer,
 )
 
-from infrastructure.persistence.database.unit_of_work import (
-    UnitOfWork,
+from infrastructure.persistence.database.postgres_unit_of_work import (
+    PostgresUnitOfWork,
 )
 
 from infrastructure.persistence.repositories.device.postgres_device_repository import (
@@ -40,7 +40,7 @@ def build_register_device_usecase(
     container: ApplicationContainer,
 ) -> RegisterDeviceUseCase:
 
-    uow = UnitOfWork(
+    uow = PostgresUnitOfWork(
         pool=container.pool,
     )
 
@@ -61,7 +61,7 @@ def build_send_device_online_usecase(
     container: ApplicationContainer,
 ) -> SendDeviceOnlineUseCase:
 
-    uow = UnitOfWork(
+    uow = PostgresUnitOfWork(
         pool=container.pool,
     )
 
