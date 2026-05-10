@@ -8,6 +8,10 @@ from application.state.state_manager import (
     StateManager,
 )
 
+from presentation.messaging.router import (
+    MessageRouter,
+)
+
 from bootstrap.container import (
     ApplicationContainer,
 )
@@ -41,6 +45,11 @@ from bootstrap.usecase_factories.singleton_factories import (
     build_create_order_usecase,
 )
 
+from bootstrap.http import (
+    build_fastapi_app,
+    build_uvicorn_config,
+)
+
 from config.config import (
     load_config,
 )
@@ -53,16 +62,12 @@ from infrastructure.runner.device_runtime_runner import (
     DeviceRuntimeRunner,
 )
 
-from presentation.messaging.router import (
-    MessageRouter,
-)
-
-
 @dataclass
 class Application:
     device_runtime_runner: (
         DeviceRuntimeRunner
     )
+    uvicorn_config: dict
 
 def build_application() -> Application:
 
@@ -146,8 +151,18 @@ def build_application() -> Application:
         )
     )
 
+    app = build_fastapi_app(
+        container=container,
+        http_config=config.http,
+    )
+    uvicorn_config = build_uvicorn_config(
+        app=app,
+        http_config=config.http,
+    )
+
     return Application(
         device_runtime_runner=(
             device_runtime_runner
         ),
+        uvicorn_config=uvicorn_config,
     )

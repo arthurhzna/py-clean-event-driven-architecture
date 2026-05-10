@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from dataclasses import field
+from enum import Enum
 from http import HTTPStatus
 from typing import Any
 
 from fastapi.responses import JSONResponse
+
+from presentation.http.responses.shared.base_response import (
+    Response,
+)
 
 from presentation.http.responses.shared.error_messages import (
     ERROR_MAP,
@@ -16,9 +21,22 @@ from presentation.http.responses.shared.response_constants import (
     SUCCESS,
 )
 
-from presentation.http.responses.shared.base_response import (
-    Response,
-)
+
+def _normalize_error(
+    err: str | Enum,
+) -> str:
+
+    if isinstance(
+        err,
+        Enum,
+    ):
+        return str(
+            err.value,
+        )
+
+    return str(
+        err,
+    )
 
 
 @dataclass
@@ -29,7 +47,7 @@ class ParamHTTPResp:
         default=None,
     )
 
-    err: str | None = field(
+    err: str | Enum | None = field(
         default=None,
     )
 
@@ -65,7 +83,7 @@ def http_response(
             ),
         )
 
-    error_code = str(
+    error_code = _normalize_error(
         param.err,
     )
 

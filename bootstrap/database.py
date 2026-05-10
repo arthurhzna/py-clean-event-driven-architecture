@@ -12,17 +12,17 @@ from infrastructure.persistence.database.database import (
 
 
 def init_database(
-    config: DatabaseConfig,
+    db_config: DatabaseConfig,
 ) -> ThreadedConnectionPool:
 
     db = Database(
-        host=config.host,
-        port=config.port,
-        user=config.user,
-        password=config.password,
-        database=config.database,
-        min_conn=config.min_conn,
-        max_conn=config.max_conn,
+        host=db_config.host,
+        port=db_config.port,
+        user=db_config.user,
+        password=db_config.password,
+        database=db_config.database,
+        min_conn=db_config.min_conn,
+        max_conn=db_config.max_conn,
     )
 
     db.migrate()

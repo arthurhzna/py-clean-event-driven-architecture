@@ -12,6 +12,7 @@ class HttpServerConfig:
     port: int
     grace_period: int
     request_timeout_period: int
+    api_key: str
 
 
 def load_http_server_config() -> HttpServerConfig:
@@ -38,5 +39,9 @@ def load_http_server_config() -> HttpServerConfig:
                 "HTTP_SERVER_REQUEST_TIMEOUT_PERIOD",
                 "30",
             )
+        ),
+        api_key=os.getenv(
+            "HTTP_SERVER_API_KEY",
+            "",
         ),
     )

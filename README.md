@@ -145,7 +145,8 @@ MessageRouter.dispatch(topic, payload)
      ▼
 RegisterDeviceMessageHandler.__call__(topic, payload)
      │
-     │ parses JSON payload
+     │ validates payload with RegisterDeviceRequest
+     │ requires device_id to be a non-empty string
      │ creates a fresh use case through factory
      ▼
 RegisterDeviceUseCase.execute(device_id)
@@ -174,7 +175,8 @@ Key files:
 | `infrastructure/messaging/mqtt/mqtt_client.py` | Paho MQTT wrapper; receives raw broker messages |
 | `presentation/messaging/router.py` | Maps topic string to handler callable |
 | `bootstrap/message_router.py` | Registers topic handlers |
-| `presentation/messaging/mqtt/handlers/register_device_message_handler.py` | Parses MQTT payload and calls use case |
+| `presentation/messaging/mqtt/handlers/register_device_message_handler.py` | Validates MQTT payload and calls use case |
+| `presentation/messaging/mqtt/requests/register_device_request.py` | Defines validated registration payload shape |
 | `application/usecase/register_device_usecase.py` | Application business flow for device registration |
 | `application/interface/persistence/unit_of_work.py` | UnitOfWork interface used by use cases |
 | `infrastructure/persistence/database/postgres_unit_of_work.py` | PostgreSQL UnitOfWork implementation |
