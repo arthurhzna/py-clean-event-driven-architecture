@@ -57,7 +57,7 @@ The system is composed of four strict layers.
 Client
   │
   │  POST /api/v1/devices/register
-  │  Body: {"device_id": "cam-01"}
+  │  Body: {"device_id": "PC_GAMINGKU"}
   ▼
 ApiKeyMiddleware                             ← validates X-API-Key header
   │
