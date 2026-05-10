@@ -1,8 +1,8 @@
-from infrastructure.config.device import (
+from config.device import (
     DeviceConfig,
 )
 
-from infrastructure.config.mqtt import (
+from config.mqtt import (
     MQTTConfig,
 )
 

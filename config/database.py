@@ -1,4 +1,4 @@
-# infrastructure/config/database.py
+# config/database.py
 
 from __future__ import annotations
 

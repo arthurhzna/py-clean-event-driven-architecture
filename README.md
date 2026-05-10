@@ -173,7 +173,7 @@ Key files:
 |------|------|
 | `infrastructure/messaging/mqtt/mqtt_client.py` | Paho MQTT wrapper; receives raw broker messages |
 | `presentation/messaging/router.py` | Maps topic string to handler callable |
-| `infrastructure/bootstrap/message_router.py` | Registers topic handlers |
+| `bootstrap/message_router.py` | Registers topic handlers |
 | `presentation/messaging/mqtt/handlers/register_device_message_handler.py` | Parses MQTT payload and calls use case |
 | `application/usecase/register_device_usecase.py` | Application business flow for device registration |
 | `application/interface/persistence/unit_of_work.py` | UnitOfWork interface used by use cases |
@@ -255,7 +255,7 @@ Key files:
 | `domain/events/device_online_event.py` | Pure domain event |
 | `domain/interface/messaging/event_bus.py` | Event bus abstraction |
 | `infrastructure/event_bus/in_memory_event_bus.py` | In-process event bus implementation |
-| `infrastructure/bootstrap/event_bus.py` | Subscribes event handlers at startup |
+| `bootstrap/event_bus.py` | Subscribes event handlers at startup |
 | `infrastructure/event_handlers/mqtt_send_device_online_handler.py` | Converts domain event to MQTT publish |
 | `infrastructure/messaging/mqtt/messages/device_online_message.py` | MQTT payload DTO |
 
@@ -474,7 +474,7 @@ device/publish  qos=1
 
 ## Bootstrap Composition Root
 
-`infrastructure/bootstrap/application.py` is the composition root. This is the place where concrete infrastructure is allowed to meet application abstractions.
+`bootstrap/application.py` is the composition root. This is the place where concrete infrastructure is allowed to meet application abstractions.
 
 ```txt
 build_application()
@@ -517,7 +517,7 @@ build_application()
 Use case factories live under:
 
 ```txt
-infrastructure/bootstrap/usecase_factories/
+bootstrap/usecase_factories/
   ├─ scoped_factories.py
   └─ singleton_factories.py
 ```
@@ -579,25 +579,28 @@ py-clean-event-driven-architecture/
 │       ├── register_device_usecase.py
 │       └── send_device_online_usecase.py
 │
+├── bootstrap/
+│   ├── application.py
+│   ├── container.py
+│   ├── database.py
+│   ├── event_bus.py
+│   ├── message_router.py
+│   ├── mqtt.py
+│   ├── services.py
+│   └── usecase_factories/
+│       ├── scoped_factories.py
+│       └── singleton_factories.py
+│
+├── config/
+│   ├── config.py
+│   ├── database.py
+│   ├── device.py
+│   ├── mqtt.py
+│   ├── http.py
+│   ├── jwt.py
+│   └── logger.py
+│
 ├── infrastructure/
-│   ├── bootstrap/
-│   │   ├── application.py
-│   │   ├── container.py
-│   │   ├── database.py
-│   │   ├── event_bus.py
-│   │   ├── message_router.py
-│   │   ├── services.py
-│   │   └── usecase_factories/
-│   │       ├── scoped_factories.py
-│   │       └── singleton_factories.py
-│   ├── config/
-│   │   ├── config.py
-│   │   ├── database.py
-│   │   ├── device.py
-│   │   ├── mqtt.py
-│   │   ├── httpserver.py
-│   │   ├── jwt.py
-│   │   └── logger.py
 │   ├── event_bus/
 │   │   ├── in_memory_event_bus.py
 │   │   ├── kafka_event_bus.py

@@ -1,4 +1,4 @@
-# Infrastructure Bootstrap
+# Application Bootstrap
 
 The bootstrap module is responsible for assembling and wiring the entire application.
 
@@ -26,6 +26,18 @@ Responsibilities:
 - initialize the complete application
 - connect all major components together
 - create the final application object/container
+
+---
+
+## container.py
+
+Application dependency holder shared by bootstrap factories.
+
+---
+
+## database.py
+
+Creates the database adapter and connection pool from runtime config.
 
 ---
 
@@ -60,6 +72,12 @@ Examples:
 
 ---
 
+## mqtt.py
+
+Creates the MQTT client adapter from runtime config.
+
+---
+
 ## services.py
 
 Responsible for creating and wiring domain/application services.
@@ -76,7 +94,7 @@ Examples:
 
 ---
 
-## usecases.py
+## usecase_factories/
 
 Responsible for creating and wiring application use cases.
 

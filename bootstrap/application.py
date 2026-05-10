@@ -8,40 +8,40 @@ from application.state.state_manager import (
     StateManager,
 )
 
-from infrastructure.bootstrap.container import (
+from bootstrap.container import (
     ApplicationContainer,
 )
 
-from infrastructure.bootstrap.database import (
+from bootstrap.database import (
     init_database,
 )
 
-from infrastructure.bootstrap.event_bus import (
+from bootstrap.event_bus import (
     register_events,
 )
 
-from infrastructure.bootstrap.message_router import (
+from bootstrap.message_router import (
     register_message_handlers,
 )
 
-from infrastructure.bootstrap.mqtt import (
+from bootstrap.mqtt import (
     build_mqtt_client,
 )
 
-from infrastructure.bootstrap.services import (
+from bootstrap.services import (
     PricingService,
 )
 
-from infrastructure.bootstrap.usecase_factories.scoped_factories import (
+from bootstrap.usecase_factories.scoped_factories import (
     build_register_device_usecase,
     build_send_device_online_usecase,
 )
 
-from infrastructure.bootstrap.usecase_factories.singleton_factories import (
+from bootstrap.usecase_factories.singleton_factories import (
     build_create_order_usecase,
 )
 
-from infrastructure.config.config import (
+from config.config import (
     load_config,
 )
 

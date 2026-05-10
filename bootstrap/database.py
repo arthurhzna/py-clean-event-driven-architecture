@@ -2,7 +2,7 @@ from psycopg2.pool import (
     ThreadedConnectionPool,
 )
 
-from infrastructure.config.database import (
+from config.database import (
     DatabaseConfig,
 )
 

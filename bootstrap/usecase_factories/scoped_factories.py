@@ -14,7 +14,7 @@ from domain.services.pricing_service import (
     PricingService,
 )
 
-from infrastructure.bootstrap.container import (
+from bootstrap.container import (
     ApplicationContainer,
 )
 

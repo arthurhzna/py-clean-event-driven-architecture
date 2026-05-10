@@ -1,4 +1,4 @@
-# Infrastructure Config
+# Application Config
 
 The config module is responsible for loading and managing application configuration.
 
@@ -35,17 +35,6 @@ Responsibilities:
 
 ---
 
-## app.py
-
-Contains general application configuration.
-
-Examples:
-- application name
-- environment
-- debug mode
-
----
-
 ## database.py
 
 Contains database-related configuration.
@@ -59,7 +48,7 @@ Examples:
 
 ---
 
-## httpserver.py
+## http.py
 
 Contains HTTP server configuration.
 

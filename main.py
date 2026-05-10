@@ -2,7 +2,7 @@ from threading import (
     Thread,
 )
 
-from infrastructure.bootstrap.application import (
+from bootstrap.application import (
     build_application,
 )
 

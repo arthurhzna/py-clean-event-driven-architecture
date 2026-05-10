@@ -4,28 +4,28 @@ from dataclasses import (
     dataclass,
 )
 
-from infrastructure.config.database import (
+from config.database import (
     DatabaseConfig,
     load_database_config,
 )
-from infrastructure.config.httpserver import (
+from config.http import (
     HttpServerConfig,
     load_http_server_config,
 )
-from infrastructure.config.jwt import (
+from config.jwt import (
     JwtConfig,
     load_jwt_config,
 )
-from infrastructure.config.logger import (
+from config.logger import (
     LoggerConfig,
     load_logger_config,
 )
 
-from infrastructure.config.device import (
+from config.device import (
     DeviceConfig,
     load_device_config,
 )
-from infrastructure.config.mqtt import (
+from config.mqtt import (
     MQTTConfig,
     load_mqtt_config,
 )

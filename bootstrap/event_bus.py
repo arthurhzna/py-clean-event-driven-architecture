@@ -1,7 +1,7 @@
 from domain.events.device_online_event import (
     DeviceOnlineEvent,
 )
-from infrastructure.bootstrap.container import (
+from bootstrap.container import (
     ApplicationContainer,
 )
 from infrastructure.event_handlers.mqtt_send_device_online_handler import (
