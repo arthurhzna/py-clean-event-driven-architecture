@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from domain.interface.messaging.event_bus import (
+from domain.ports.messaging.event_bus import (
     BaseEventBus,
     EventHandler,
 )

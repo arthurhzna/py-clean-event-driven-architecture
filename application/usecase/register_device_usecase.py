@@ -28,7 +28,7 @@ from domain.errors.device_error import (
     DeviceError,
 )
 
-from domain.interface.repositories.device_repository import (
+from domain.ports.repositories.device_repository import (
     DeviceRepository,
 )
 

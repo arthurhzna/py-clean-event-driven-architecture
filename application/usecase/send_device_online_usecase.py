@@ -13,7 +13,7 @@ from domain.events.device_online_event import (
     DeviceOnlineEvent,
 )
 
-from domain.interface.messaging.event_bus import (
+from domain.ports.messaging.event_bus import (
     BaseEventBus,
 )
 

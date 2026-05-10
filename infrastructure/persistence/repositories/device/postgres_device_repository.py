@@ -4,7 +4,7 @@ from domain.entities.device import (
     Device,
 )
 
-from domain.interface.repositories.device_repository import (
+from domain.ports.repositories.device_repository import (
     DeviceRepository,
 )
 
