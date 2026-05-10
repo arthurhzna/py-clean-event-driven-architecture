@@ -35,7 +35,7 @@ class RegisterDeviceUseCase:
 
     def execute(
         self,
-        device_id: int,
+        device_id: str,
     ) -> None:
 
         with self._uow as uow:

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-import json
+from collections.abc import Callable
 
-from collections.abc import (
-    Callable,
+from pydantic import (
+    ValidationError,
 )
 
 from application.usecase.register_device_usecase import (
     RegisterDeviceUseCase,
+)
+
+from presentation.messaging.mqtt.requests.register_device_request import (
+    RegisterDeviceRequest,
 )
 
 
@@ -30,18 +34,22 @@ class RegisterDeviceMessageHandler:
         payload: bytes,
     ) -> None:
 
-        data = json.loads(
-            payload.decode(),
-        )
+        try:
 
-        device_id = int(
-            data["device_id"],
-        )
+            request = (
+                RegisterDeviceRequest.model_validate_json(
+                    payload,
+                )
+            )
+
+        except ValidationError:
+
+            return
 
         usecase = (
             self._create_usecase()
         )
 
         usecase.execute(
-            device_id=device_id,
+            device_id=request.device_id,
         )

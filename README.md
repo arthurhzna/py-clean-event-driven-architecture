@@ -128,7 +128,7 @@ When the broker receives a device registration message:
 MQTT Broker
      │
      │ topic: "device/register"
-     │ payload: {"device_id": 42}
+     │ payload: {"device_id": "device-42"}
      ▼
 MqttClient._cb_message()
      │
@@ -190,7 +190,7 @@ router.register(
     RegisterDeviceMessageHandler(create_usecase=...)
 )
 
-router.dispatch("device/register", b'{"device_id": 42}')
+router.dispatch("device/register", b'{"device_id": "device-42"}')
 ```
 
 The router calls the handler as:
@@ -299,7 +299,7 @@ infrastructure/persistence/database/postgres_unit_of_work.py
 Register device transaction:
 
 ```python
-def execute(self, device_id: int) -> None:
+def execute(self, device_id: str) -> None:
     with self._uow as uow:
         device = Device(
             device_id=device_id,

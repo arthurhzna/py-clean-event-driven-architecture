@@ -42,7 +42,7 @@ class PostgresDeviceRepository(
 
     def get_by_id(
         self,
-        device_id: int,
+        device_id: str,
     ) -> Device | None:
 
         self.cursor.execute(
@@ -68,7 +68,7 @@ class PostgresDeviceRepository(
 
     def exists(
         self,
-        device_id: int,
+        device_id: str,
     ) -> bool:
 
         self.cursor.execute(
@@ -87,7 +87,7 @@ class PostgresDeviceRepository(
 
     def delete(
         self,
-        device_id: int,
+        device_id: str,
     ) -> None:
 
         self.cursor.execute(
