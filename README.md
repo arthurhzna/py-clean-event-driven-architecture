@@ -4,42 +4,8 @@
 
 # Python Clean Event-Driven Architecture
 
-A Python template for event-driven applications with Clean Architecture, MQTT inbound/outbound messaging, a message router, an event bus, a background thread runner, and Unit of Work based database transactions.
-
----
-
-# Why Clean Architecture?
-
-As applications grow, business logic often becomes tightly coupled with:
-- databases
-- messaging systems
-- frameworks
-- external services
-- infrastructure code
-
-This makes systems:
-- difficult to test
-- hard to maintain
-- difficult to scale
-- tightly coupled to implementation details
-
-Clean Architecture helps solve this by separating the application into clear layers with explicit responsibilities.
-
-Benefits:
-- independent business logic
-- easier testing
-- lower coupling
-- better maintainability
-- replaceable infrastructure
-- scalable architecture for long-term projects
-
-The goal is to keep the core business rules independent from:
-- databases
-- frameworks
-- transport protocols
-- external systems
-
-This template demonstrates how to structure an event-driven Python application while keeping dependency direction clean and maintainable.
+A real-time device monitoring system built with **Clean Architecture** and **Event-Driven** principles.  
+The system exposes an HTTP API, connects to an MQTT broker, processes inbound device messages, and continuously publishes device heartbeat events — all running in a single process via threads.
 
 ---
 
@@ -47,13 +13,14 @@ This template demonstrates how to structure an event-driven Python application w
 
 - [Architecture Overview](#architecture-overview)
 - [Runtime Overview](#runtime-overview)
-- [Flow 1 - MQTT Inbound to Router to Use Case](#flow-1---mqtt-inbound-to-router-to-use-case)
-- [Flow 2 - Thread Runner to Event Bus to MQTT Outbound](#flow-2---thread-runner-to-event-bus-to-mqtt-outbound)
-- [Flow 3 - Unit of Work Transaction in Infrastructure](#flow-3---unit-of-work-transaction-in-infrastructure)
-- [Message Router](#message-router)
-- [Event Bus](#event-bus)
-- [MQTT Client](#mqtt-client)
-- [Bootstrap Composition Root](#bootstrap-composition-root)
+- [Flow 1 — HTTP Inbound → Controller → Use Case](#flow-1--http-inbound--controller--use-case)
+- [Flow 2 — MQTT Inbound → Router → Use Case](#flow-2--mqtt-inbound--router--use-case)
+- [Flow 3 — Thread Runner → Event Bus → MQTT Outbound](#flow-3--thread-runner--event-bus--mqtt-outbound)
+- [Unit of Work — How Transactions Work](#unit-of-work--how-transactions-work)
+- [Result Type — How Errors Are Handled](#result-type--how-errors-are-handled)
+- [DTO — Input and Output Contracts](#dto--input-and-output-contracts)
+- [Scoped Factories — Use Case Lifecycle](#scoped-factories--use-case-lifecycle)
+- [Bootstrap — Composition Root](#bootstrap--composition-root)
 - [Dependency Rules](#dependency-rules)
 - [Project Structure](#project-structure)
 
@@ -61,599 +28,485 @@ This template demonstrates how to structure an event-driven Python application w
 
 ## Architecture Overview
 
-The system is split into four layers. Dependencies point inward: outer layers can know inner layers, but inner layers never know outer layers.
+The system is composed of four strict layers.  
+**Dependencies always point inward — outer layers know about inner layers, never the reverse.**
 
 ```
-┌─────────────────────────────────────────────┐
-│              Presentation                   │  Message router, MQTT handlers
-├─────────────────────────────────────────────┤
-│              Application                    │  Use cases, state manager, interfaces
-├─────────────────────────────────────────────┤
-│               Domain                        │  Entities, events, repository contracts
-├─────────────────────────────────────────────┤
-│            Infrastructure                   │  Postgres, MQTT client, event bus, runner
-└─────────────────────────────────────────────┘
-```
-
-The important idea:
-
-```txt
-Application code depends on abstractions.
-Infrastructure code implements those abstractions.
-Bootstrap wires everything together.
-```
-
-Example:
-
-```txt
-RegisterDeviceUseCase
-  depends on UnitOfWork interface + DeviceRepository interface
-
-PostgresUnitOfWork
-  implements UnitOfWork using psycopg2 connection pool
-
-PostgresDeviceRepository
-  implements DeviceRepository using SQL
+┌────────────────────────────────────────────────────────────────┐
+│  Presentation                                                  │
+│  HTTP routes, controllers, requests, responses, presenters     │
+│  MQTT handlers, message router                                 │
+├────────────────────────────────────────────────────────────────┤
+│  Application                                                   │
+│  Use cases, DTOs, Result type, UnitOfWork interface            │
+│  StateManager, use case factories                              │
+├────────────────────────────────────────────────────────────────┤
+│  Domain                                                        │
+│  Entities, events, errors, ports (repository + event bus)      │
+├────────────────────────────────────────────────────────────────┤
+│  Infrastructure                                                │
+│  Postgres, MQTT client, InMemoryEventBus, runners              │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Runtime Overview
 
-There are two main runtime paths:
+`main.py` starts two concurrent workers in a single process:
 
-| Runtime path | Purpose |
-|--------------|---------|
-| MQTT listener | Receives broker messages and dispatches them to use cases |
-| Thread runner | Runs a periodic loop that publishes device-online events |
-
-At startup:
-
-```txt
-main.py
-  ├─ build_application()
-  ├─ starts DeviceRuntimeRunner.run() in a daemon Thread
-  └─ keeps the process alive
 ```
-
-The MQTT network loop is handled by `paho-mqtt` through `MqttClient.connect()`, which calls `client.loop_start()`.
+main.py
+  │
+  ├── Thread(daemon=True)
+  │     └── DeviceRuntimeRunner.run()   ← while True loop, publishes heartbeat
+  │
+  └── uvicorn.run(app)                  ← FastAPI HTTP server + MQTT listener
+```
 
 ---
 
-## Flow 1 - MQTT Inbound to Router to Use Case
+## Flow 1 — HTTP Inbound → Controller → Use Case
 
-When the broker receives a device registration message:
+```
+Client
+  │
+  │  POST /api/v1/devices/register
+  │  Body: {"device_id": "cam-01"}
+  ▼
+ApiKeyMiddleware                             ← validates X-API-Key header
+  │
+  ▼
+FastAPI router (device_routes.py)            ← presentation/http/routes/
+  │  parses body → RegisterDeviceRequest (Pydantic)
+  ▼
+RegisterDeviceController.handle(request)     ← presentation/http/controllers/
+  │  builds RegisterDeviceInput DTO
+  ▼
+RegisterDeviceUseCase.execute(input_dto)     ← application/usecase/
+  │  [scoped: fresh instance per request]
+  │
+  ├── device_repository.get_by_id(id)
+  │     → if exists: return Err(DeviceError.DEVICE_ALREADY_REGISTERED)
+  │
+  ├── device = Device(device_id, is_registered=True)
+  │
+  ├── with self._uow as uow:               ← UnitOfWork context manager
+  │       device_repository.save(device)   ← domain port, no SQL knowledge
+  │       uow.commit()
+  │
+  ├── state_manager.update_device_publish_permission(True)
+  │
+  └── return Ok(RegisterDeviceOutput)
+        │
+        ▼
+DevicePresenter.to_response(output)          ← presentation/http/presenters/
+  │  maps output DTO → RegisterDeviceData (Pydantic)
+  ▼
+http_response(ParamHTTPResp)
+  │  wraps in Response envelope → JSONResponse
+  ▼
+Client receives:
+  201 Created
+  {"status": "success", "data": {"device_id": "cam-01", "status": "active"}}
 
-```txt
-MQTT Broker
-     │
-     │ topic: "device/register"
-     │ payload: {"device_id": "device-42"}
-     ▼
-MqttClient._cb_message()
-     │
-     │ converts raw paho message into (topic: str, payload: bytes)
-     ▼
-MqttClient.on_message(topic, payload)
-     │
-     │ wired in bootstrap:
-     │ mqtt_client.on_message = router.dispatch
-     ▼
-MessageRouter.dispatch(topic, payload)
-     │
-     │ finds handler by topic key
-     ▼
-RegisterDeviceMessageHandler.__call__(topic, payload)
-     │
-     │ validates payload with RegisterDeviceRequest
-     │ requires device_id to be a non-empty string
-     │ creates a fresh use case through factory
-     ▼
-RegisterDeviceUseCase.execute(device_id)
-     │
-     │ opens UnitOfWork transaction
-     ▼
-PostgresUnitOfWork.__enter__()
-     │
-     │ borrows connection from ThreadedConnectionPool
-     ▼
-PostgresDeviceRepository.save(device)
-     │
-     │ executes SQL using cursor from UnitOfWork connection
-     ▼
-uow.commit()
-     │
-     │ commits PostgreSQL transaction
-     ▼
-StateManager.update_device_registration(True)
+  400 Bad Request (if already registered)
+  {"status": "error", "message": "device_already_registered"}
 ```
 
-Key files:
+### Key files
 
 | File | Role |
 |------|------|
-| `infrastructure/messaging/mqtt/mqtt_client.py` | Paho MQTT wrapper; receives raw broker messages |
-| `presentation/messaging/router.py` | Maps topic string to handler callable |
-| `bootstrap/message_router.py` | Registers topic handlers |
-| `presentation/messaging/mqtt/handlers/register_device_message_handler.py` | Validates MQTT payload and calls use case |
-| `presentation/messaging/mqtt/requests/register_device_request.py` | Defines validated registration payload shape |
-| `application/usecase/register_device_usecase.py` | Application business flow for device registration |
-| `application/interface/persistence/unit_of_work.py` | UnitOfWork interface used by use cases |
-| `infrastructure/persistence/database/postgres_unit_of_work.py` | PostgreSQL UnitOfWork implementation |
-| `infrastructure/persistence/repositories/device/postgres_device_repository.py` | SQL implementation of device repository |
-
-Router example:
-
-```python
-router = MessageRouter()
-
-router.register(
-    "device/register",
-    RegisterDeviceMessageHandler(create_usecase=...)
-)
-
-router.dispatch("device/register", b'{"device_id": "device-42"}')
-```
-
-The router calls the handler as:
-
-```python
-handler(topic, payload)
-```
+| `presentation/http/routes/device_routes.py` | FastAPI `APIRouter`, maps path → controller |
+| `presentation/http/controllers/register_device_controller.py` | Parses request, calls use case, formats response |
+| `presentation/http/requests/register_device_request.py` | Pydantic input validation |
+| `presentation/http/presenters/device_presenter.py` | Maps output DTO → response schema |
+| `presentation/http/responses/register_device_response.py` | Response body schema |
+| `presentation/http/responses/shared/response_helper.py` | `http_response()` envelope builder |
+| `application/usecase/register_device_usecase.py` | Business logic + transaction ownership |
 
 ---
 
-## Flow 2 - Thread Runner to Event Bus to MQTT Outbound
+## Flow 2 — MQTT Inbound → Router → Use Case
 
-The app also has a background runtime loop. It periodically publishes a device-online event.
+```
+MQTT Broker
+  │
+  │  topic: "device/register"
+  │  payload: {"device_id": "cam-01"}
+  ▼
+MqttClient.on_message(topic, payload)        ← infrastructure/messaging/mqtt/
+  │  wired to router.dispatch at startup
+  ▼
+MessageRouter.dispatch(topic, payload)       ← presentation/messaging/router.py
+  │  looks up handler by topic key
+  ▼
+RegisterDeviceMessageHandler.__call__()      ← presentation/messaging/mqtt/handlers/
+  │  parses JSON, extracts device_id
+  │  calls scoped factory → fresh use case instance
+  ▼
+RegisterDeviceUseCase.execute(input_dto)     ← same use case as HTTP flow
+  │
+  └── same transaction + state logic as Flow 1
+```
 
-```txt
-main.py
-     │
-     │ starts daemon thread
-     ▼
-DeviceRuntimeRunner.run()
-     │
-     │ while True:
-     │   create fresh SendDeviceOnlineUseCase
-     │   execute(device_id)
-     │   sleep(interval_seconds)
-     ▼
-SendDeviceOnlineUseCase.execute(device_id)
-     │
-     │ creates domain event
-     ▼
-DeviceOnlineEvent(device_id, timestamp)
-     │
-     ▼
-BaseEventBus.publish(event)
-     │
-     │ concrete implementation: InMemoryEventBus
-     ▼
-InMemoryEventBus.publish(event)
-     │
-     │ finds handlers subscribed for DeviceOnlineEvent
-     ▼
-MQTTSendDeviceOnlineHandler.__call__(event)
-     │
-     │ converts event into DeviceOnlineMessage
-     ▼
+### Subscribed topics
+
+| Topic | Handler |
+|-------|---------|
+| `device/register` | `RegisterDeviceMessageHandler` |
+| `device/config` | *(extensible)* |
+| `device/publish` | *(extensible)* |
+
+---
+
+## Flow 3 — Thread Runner → Event Bus → MQTT Outbound
+
+```
+Thread (daemon=True, started in main.py)
+  │
+  ▼
+DeviceRuntimeRunner.run()                    ← infrastructure/runner/
+  │
+  │  while True:
+  │    usecase = create_usecase()            ← scoped factory, fresh per iteration
+  │    usecase.execute(device_id)
+  │    sleep(5)
+  ▼
+SendDeviceOnlineUseCase.execute(device_id)   ← application/usecase/
+  │
+  │  creates domain event
+  ▼
+DeviceOnlineEvent(device_id, timestamp)      ← domain/events/
+  │
+  ▼
+BaseEventBus.publish(event)                  ← domain/ports/messaging/event_bus.py
+  │  concrete impl: InMemoryEventBus
+  ▼
+InMemoryEventBus                             ← infrastructure/event_bus/
+  │  iterates subscribed handlers for DeviceOnlineEvent
+  ▼
+MQTTSendDeviceOnlineHandler.__call__(event)  ← infrastructure/event_handlers/
+  │  serializes → DeviceOnlineMessage
+  ▼
 MqttClient.publish(
     topic="device/online",
     payload=message.to_bytes()
 )
-     │
-     ▼
+  │
+  ▼
 MQTT Broker
 ```
 
-Key files:
-
-| File | Role |
-|------|------|
-| `main.py` | Starts app and daemon thread |
-| `infrastructure/runner/device_runtime_runner.py` | Periodic `while True` runner |
-| `application/usecase/send_device_online_usecase.py` | Creates and publishes `DeviceOnlineEvent` |
-| `domain/events/device_online_event.py` | Pure domain event |
-| `domain/interface/messaging/event_bus.py` | Event bus abstraction |
-| `infrastructure/event_bus/in_memory_event_bus.py` | In-process event bus implementation |
-| `bootstrap/event_bus.py` | Subscribes event handlers at startup |
-| `infrastructure/event_handlers/mqtt_send_device_online_handler.py` | Converts domain event to MQTT publish |
-| `infrastructure/messaging/mqtt/messages/device_online_message.py` | MQTT payload DTO |
-
-The use case only knows `BaseEventBus`. It does not know MQTT exists.
-
-That is the clean part:
-
-```txt
-SendDeviceOnlineUseCase -> BaseEventBus
-InMemoryEventBus        -> handler list
-MQTT handler            -> MqttClient.publish()
-```
-
-To swap MQTT outbound for Kafka outbound, replace the subscribed event handler in bootstrap. The use case stays untouched.
+> The use case only knows `BaseEventBus` — it never knows MQTT exists.  
+> Swapping MQTT for Kafka requires only changing the handler registration in `bootstrap/event_bus.py`.
 
 ---
 
-## Flow 3 - Unit of Work Transaction in Infrastructure
+## Unit of Work — How Transactions Work
 
-This is the important transaction design in the current template.
+The `UnitOfWork` pattern replaces the old `Tx`-in-domain approach.  
+The use case owns the transaction boundary; the repository just executes SQL.
 
-The use case owns the application flow, but infrastructure owns the database mechanics.
-
-```txt
-application/interface/persistence/unit_of_work.py
-    UnitOfWork ABC
-        ├─ __enter__()
-        ├─ __exit__()
-        ├─ commit()
-        └─ rollback()
-
+```
+application/interface/persistence/unit_of_work.py   ← abstract contract (Application layer)
+        ↑ implemented by
 infrastructure/persistence/database/postgres_unit_of_work.py
-    PostgresUnitOfWork
-        ├─ borrows connection from pool
-        ├─ exposes active connection to repositories
-        ├─ commits on success when use case calls commit()
-        ├─ rolls back on exception
-        └─ returns connection to pool
 ```
 
-Register device transaction:
+### Inside the use case
 
 ```python
-def execute(self, device_id: str) -> None:
-    with self._uow as uow:
-        device = Device(
-            device_id=device_id,
-            is_registered=True,
-        )
+# application/usecase/register_device_usecase.py
 
-        self._device_repository.save(device)
-
-        uow.commit()
-
-    self._state_manager.update_device_registration(True)
+with self._uow as uow:               # __enter__: borrow connection from pool
+    self._device_repository.save(device)
+    uow.commit()                     # explicit commit
+                                     # __exit__: rollback on exception, return to pool
 ```
 
-What happens under the hood:
+### Inside `PostgresUnitOfWork`
 
-```txt
-with self._uow as uow
-  │
-  ├─ PostgresUnitOfWork.__enter__()
-  │    └─ conn = pool.getconn()
-  │
-  ├─ repository.save(device)
-  │    └─ cursor = uow.connection.cursor()
-  │    └─ cursor.execute(INSERT INTO device ...)
-  │
-  ├─ uow.commit()
-  │    └─ conn.commit()
-  │
-  └─ PostgresUnitOfWork.__exit__()
-       ├─ if exception: conn.rollback()
-       └─ pool.putconn(conn)
+```
+__enter__   → conn = pool.getconn()   (borrow from pool)
+commit()    → conn.commit()
+rollback()  → conn.rollback()
+__exit__    → if exception: rollback()
+             pool.putconn(conn)        (return to pool)
 ```
 
-Why this is clean:
+### Inside repositories
 
-- The application layer depends on `UnitOfWork`, not `psycopg2`.
-- The use case says "this operation is atomic" without knowing how PostgreSQL works.
-- The repository interface does not receive a raw `tx` or cursor parameter.
-- SQL and cursor usage stay inside infrastructure repositories.
-- Connection pooling, commit, rollback, and connection return happen in infrastructure.
+```
+BaseRepository.cursor
+  └── self._uow.connection.cursor()
 
-Why this is nice for a large project:
-
-```txt
-Use case:
-  controls business flow and transaction boundary
-
-UnitOfWork interface:
-  gives application a stable abstraction
-
-PostgresUnitOfWork:
-  owns concrete database transaction mechanics
-
-Repository:
-  owns SQL details
+PostgresDeviceRepository(BaseRepository, DeviceRepository)
+  └── self.cursor.execute(SQL)        ← cursor from active UoW connection
 ```
 
-This is the powerful part: the transaction is visible at the use-case level as a business boundary, but the database details are hidden in infrastructure.
+### Why domain repository has no `Tx` parameter
+
+```python
+# domain/ports/repositories/device_repository.py  ← clean, no SQL concepts
+class DeviceRepository(ABC):
+    def save(self, device: Device) -> None: ...
+    def get_by_id(self, device_id: str) -> Device | None: ...
+```
+
+The domain repository speaks the **business language** (save a Device), not SQL.  
+The `UnitOfWork` lives in the Application layer — domain never knows it exists.
 
 ---
 
-## Message Router
+## Result Type — How Errors Are Handled
 
-`MessageRouter` is a small presentation component that maps an incoming route/topic to a handler.
+Instead of raising exceptions for expected errors, use cases return a `Result` type.
 
 ```python
-RouteHandler = Callable[[str, bytes], Any]
+# application/result.py
+Result = Ok[T] | Err[E]
 ```
 
-```txt
-MessageRouter
-  ├─ register(route, handler)
-  └─ dispatch(route, payload)
-       ├─ handler = _handlers.get(route)
-       ├─ if missing: ignore
-       └─ handler(route, payload)
+```
+RegisterDeviceUseCase.execute()
+  │
+  ├── device exists?   → return Err(DeviceError.DEVICE_ALREADY_REGISTERED)
+  │
+  └── success?         → return Ok(RegisterDeviceOutput(...))
 ```
 
-Current registration:
+Controller checks the result:
 
-```txt
-"device/register" -> RegisterDeviceMessageHandler
+```python
+result = usecase.execute(input_dto)
+
+if result.is_err():
+    return http_response(ParamHTTPResp(code=400, err=result.error))
+
+return http_response(ParamHTTPResp(code=201, data=presenter.to_response(result.value)))
 ```
 
-The router does not know MQTT, JSON, database, or use-case internals. It only knows topic-like routes and callables.
+Domain errors live in `domain/errors/device_error.py` as `Enum` values, mapped to human-readable messages in `presentation/http/responses/shared/error_messages.py`.
 
 ---
 
-## Event Bus
+## DTO — Input and Output Contracts
 
-The event bus decouples application use cases from side effects.
+Use cases do not receive raw request objects or return domain entities directly.  
+They communicate through **DTOs** defined in the Application layer.
 
-```txt
-BaseEventBus
-  ├─ publish(event)
-  └─ subscribe(event_type, handler)
+```
+Presentation                    Application                     Domain
+RegisterDeviceRequest  →  RegisterDeviceInput  →  (use case)  →  Device entity
+(Pydantic)                (dataclass)                              (dataclass)
+
+                          RegisterDeviceOutput  ←  (use case)
+                          (dataclass)
+                                │
+DevicePresenter         ←       │
+RegisterDeviceData      (maps output → response schema)
+(Pydantic)
 ```
 
-Current implementation:
+| File | Type | Direction |
+|------|------|-----------|
+| `application/dto/input/register_device_input.py` | `RegisterDeviceInput` | Presentation → Application |
+| `application/dto/output/register_device_output.py` | `RegisterDeviceOutput` | Application → Presentation |
+| `presentation/http/requests/register_device_request.py` | `RegisterDeviceRequest` | HTTP body → Controller |
+| `presentation/http/responses/register_device_response.py` | `RegisterDeviceData` | Presenter → HTTP body |
 
-```txt
-InMemoryEventBus
-  └─ dict[type, list[handler]]
-```
+---
 
-Startup subscription:
+## Scoped Factories — Use Case Lifecycle
+
+Use cases are **not singletons**. A fresh instance is created per HTTP request or MQTT message.  
+This ensures each request gets its own `UnitOfWork` and clean connection from the pool.
 
 ```python
-event_bus.subscribe(
-    DeviceOnlineEvent,
-    MQTTSendDeviceOnlineHandler(mqtt_client),
+# bootstrap/http_router.py
+app.include_router(
+    make_device_router(
+        lambda: build_register_device_usecase(container=container)
+    )
 )
 ```
 
-Runtime publish:
+```python
+# bootstrap/usecase_factories/scoped_factories.py
+def build_register_device_usecase(container) -> RegisterDeviceUseCase:
+    uow = PostgresUnitOfWork(pool=container.pool)          # fresh UoW per call
+    device_repository = PostgresDeviceRepository(uow=uow)  # fresh repo per call
+    return RegisterDeviceUseCase(uow, state_manager, device_repository)
+```
+
+The controller receives a `Callable[[], UseCase]` factory, not the use case directly:
 
 ```python
-event_bus.publish(
-    DeviceOnlineEvent(device_id=device_id, timestamp=...)
-)
-```
+class RegisterDeviceController:
+    def __init__(self, usecase_factory: Callable[[], RegisterDeviceUseCase]):
+        self._factory = usecase_factory
 
-This keeps the use case clean:
-
-```txt
-Use case publishes a domain event.
-Infrastructure decides what side effect happens.
+    async def handle(self, request):
+        usecase = self._factory()   # new instance per request
+        ...
 ```
 
 ---
 
-## MQTT Client
+## Bootstrap — Composition Root
 
-`MqttClient` is an infrastructure wrapper around `paho-mqtt`.
+`bootstrap/application.py` is the **only place** where all layers are wired together.
 
-Responsibilities:
-
-- Create and configure the paho client.
-- Apply username/password when provided.
-- Enable TLS when configured.
-- Start the paho network loop using `loop_start()`.
-- Convert paho messages into `(topic: str, payload: bytes)`.
-- Store subscriptions as `(topic, qos)` pairs.
-- Re-subscribe after connect.
-- Publish messages with a lock to keep outbound publishing thread-safe.
-
-Inbound callback:
-
-```txt
-paho on_message
-  -> MqttClient._cb_message
-  -> self.on_message(topic, payload)
-  -> MessageRouter.dispatch(topic, payload)
 ```
-
-Outbound call:
-
-```txt
-MQTTSendDeviceOnlineHandler
-  -> MqttClient.publish("device/online", payload)
-```
-
-Current subscriptions:
-
-```txt
-device/config   qos=0
-device/register qos=1
-device/publish  qos=1
-```
-
----
-
-## Bootstrap Composition Root
-
-`bootstrap/application.py` is the composition root. This is the place where concrete infrastructure is allowed to meet application abstractions.
-
-```txt
 build_application()
   │
-  ├─ load_config()
-  │    ├─ database config
-  │    ├─ mqtt config
-  │    └─ device config
+  ├── load_config()                              → Config (DB, MQTT, HTTP, Device)
+  ├── init_database(config.database)             → ThreadedConnectionPool
+  ├── StateManager()                             → in-memory state
+  ├── InMemoryEventBus()                         → event bus
+  ├── build_mqtt_client(config)                  → MqttClient
   │
-  ├─ init_database(config.database)
-  │    └─ returns ThreadedConnectionPool
+  ├── ApplicationContainer(pool, state, bus, mqtt)
   │
-  ├─ StateManager()
-  ├─ InMemoryEventBus()
-  ├─ MqttClient(...)
+  ├── register_events(container)
+  │     └── event_bus.subscribe(DeviceOnlineEvent, MQTTSendDeviceOnlineHandler)
   │
-  ├─ ApplicationContainer(
-  │     pool,
-  │     state_manager,
-  │     event_bus,
-  │     mqtt_client,
-  │   )
+  ├── register_message_handlers(router, factory)
+  │     └── router.register("device/register", RegisterDeviceMessageHandler)
   │
-  ├─ register_events(container)
-  │    └─ DeviceOnlineEvent -> MQTTSendDeviceOnlineHandler
+  ├── mqtt_client.on_message = router.dispatch
+  │   mqtt_client.connect()
+  │   mqtt_client.subscribe([("device/config",0), ("device/register",1), ...])
   │
-  ├─ register_message_handlers(...)
-  │    └─ "device/register" -> RegisterDeviceMessageHandler
+  ├── DeviceRuntimeRunner(create_usecase=lambda: build_send_device_online_usecase(...))
   │
-  ├─ mqtt_client.on_message = router.dispatch
-  ├─ mqtt_client.connect()
-  ├─ mqtt_client.subscribe([...])
+  ├── build_fastapi_app(container, config.http)
+  │     └── ApiKeyMiddleware
+  │     └── register_http_routes → make_device_router(lambda: build_register_device_usecase(...))
   │
-  └─ DeviceRuntimeRunner(
-       create_usecase=lambda: build_send_device_online_usecase(container),
-       device_id=config.device.device_id,
-     )
+  └── return Application(device_runtime_runner, uvicorn_config)
 ```
-
-Use case factories live under:
-
-```txt
-bootstrap/usecase_factories/
-  ├─ scoped_factories.py
-  └─ singleton_factories.py
-```
-
-The scoped factory creates a fresh `PostgresUnitOfWork` for flows that need their own transactional scope.
 
 ---
 
 ## Dependency Rules
 
-```txt
-Presentation   -> Application -> Domain
-Infrastructure -> Application -> Domain
-Domain         -> nothing outward
+```
+Presentation   →  Application  →  Domain
+Infrastructure →  Application  →  Domain
+                                  Domain → (nothing)
+Bootstrap      →  ALL layers   (composition root only)
 ```
 
-| Layer | Can import from | Cannot import from |
-|-------|-----------------|--------------------|
-| Domain | standard library only / pure domain modules | Application, Infrastructure, Presentation |
-| Application | Domain, application interfaces/state | Infrastructure, Presentation |
-| Infrastructure | Application, Domain | Presentation |
-| Presentation | Application, Domain | Infrastructure |
-
-Bootstrap is the exception by design: it is the composition root that wires presentation, application, domain abstractions, and infrastructure implementations.
+| Layer | Can import | Cannot import |
+|-------|-----------|---------------|
+| Domain | stdlib only | Everything |
+| Application | Domain | Infrastructure, Presentation |
+| Infrastructure | Domain, Application | Presentation |
+| Presentation | Domain, Application | Infrastructure |
+| Bootstrap | Everything | — |
 
 ---
 
 ## Project Structure
 
-```txt
+```
 py-clean-event-driven-architecture/
 │
-├── main.py
-│   └── builds the app and starts DeviceRuntimeRunner in a daemon thread
+├── main.py                                    # entry point: Thread(runner) + uvicorn
 │
-├── domain/
+├── bootstrap/                                 # composition root
+│   ├── application.py                         # build_application() ← start here
+│   ├── container.py                           # ApplicationContainer dataclass
+│   ├── database.py                            # init_database() → pool
+│   ├── event_bus.py                           # register_events(container)
+│   ├── http.py                                # build_fastapi_app(), build_uvicorn_config()
+│   ├── http_router.py                         # register_http_routes(app, container)
+│   ├── message_router.py                      # register_message_handlers(router, factory)
+│   ├── mqtt.py                                # build_mqtt_client(config)
+│   ├── services.py                            # PricingService (singleton)
+│   └── usecase_factories/
+│       ├── scoped_factories.py                # fresh UseCase per call (HTTP/MQTT)
+│       └── singleton_factories.py             # shared UseCase (stateless)
+│
+├── config/                                    # typed config loading
+│
+├── domain/                                    # innermost — no dependencies
 │   ├── entities/
-│   │   └── device.py
+│   │   └── device.py                          # Device(device_id, is_registered)
+│   ├── errors/
+│   │   └── device_error.py                    # DeviceError enum
 │   ├── events/
-│   │   └── device_online_event.py
-│   ├── interface/
-│   │   ├── messaging/
-│   │   │   └── event_bus.py
-│   │   └── repositories/
-│   │       └── device_repository.py
-│   └── services/
-│       └── pricing_service.py
+│   │   └── device_online_event.py             # DeviceOnlineEvent(device_id, timestamp)
+│   └── ports/
+│       ├── messaging/
+│       │   └── event_bus.py                   # BaseEventBus (publish, subscribe)
+│       └── repositories/
+│           └── device_repository.py           # DeviceRepository ABC — no Tx, no SQL
 │
-├── application/
+├── application/                               # use cases + application-level contracts
+│   ├── dto/
+│   │   ├── input/
+│   │   │   └── register_device_input.py       # RegisterDeviceInput
+│   │   └── output/
+│   │       └── register_device_output.py      # RegisterDeviceOutput
 │   ├── interface/
 │   │   └── persistence/
-│   │       └── unit_of_work.py
+│   │       └── unit_of_work.py                # UnitOfWork ABC (__enter__, commit, rollback)
+│   ├── result.py                              # Ok[T] | Err[E] Result type
 │   ├── state/
-│   │   ├── device_state.py
-│   │   ├── screenshot_state.py
-│   │   └── state_manager.py
+│   │   └── state_manager.py                   # thread-safe in-memory state
 │   └── usecase/
-│       ├── create_order_usecase.py
-│       ├── register_device_usecase.py
-│       └── send_device_online_usecase.py
+│       ├── register_device_usecase.py         # HTTP + MQTT registration, owns transaction
+│       └── send_device_online_usecase.py      # publishes DeviceOnlineEvent
 │
-├── bootstrap/
-│   ├── application.py
-│   ├── container.py
-│   ├── database.py
-│   ├── event_bus.py
-│   ├── message_router.py
-│   ├── mqtt.py
-│   ├── services.py
-│   └── usecase_factories/
-│       ├── scoped_factories.py
-│       └── singleton_factories.py
-│
-├── config/
-│   ├── config.py
-│   ├── database.py
-│   ├── device.py
-│   ├── mqtt.py
-│   ├── http.py
-│   ├── jwt.py
-│   └── logger.py
-│
-├── infrastructure/
+├── infrastructure/                            # all external concerns
 │   ├── event_bus/
-│   │   ├── in_memory_event_bus.py
-│   │   ├── kafka_event_bus.py
-│   │   └── rabbitmq_event_bus.py
+│   │   ├── in_memory_event_bus.py             # InMemoryEventBus
+│   │   ├── kafka_event_bus.py                 # KafkaEventBus (swappable)
+│   │   └── rabbitmq_event_bus.py              # RabbitMQEventBus (swappable)
 │   ├── event_handlers/
-│   │   └── mqtt_send_device_online_handler.py
+│   │   └── mqtt_send_device_online_handler.py # DeviceOnlineEvent → MQTT publish
 │   ├── messaging/
 │   │   └── mqtt/
-│   │       ├── mqtt_client.py
+│   │       ├── mqtt_client.py                 # paho-mqtt wrapper
 │   │       └── messages/
-│   │           └── device_online_message.py
+│   │           └── device_online_message.py   # MQTT payload DTO
 │   ├── persistence/
 │   │   ├── database/
-│   │   │   ├── database.py
-│   │   │   ├── postgres_unit_of_work.py
+│   │   │   ├── database.py                    # Database (pool, migrate)
+│   │   │   ├── postgres_unit_of_work.py       # PostgresUnitOfWork (context manager)
 │   │   │   └── migrations/
-│   │   │       └── init_schema.py
 │   │   └── repositories/
-│   │       ├── base_repository.py
+│   │       ├── base_repository.py             # BaseRepository (exposes cursor via UoW)
 │   │       └── device/
 │   │           └── postgres_device_repository.py
 │   └── runner/
-│       └── device_runtime_runner.py
+│       └── device_runtime_runner.py           # while True → SendDeviceOnlineUseCase
 │
-└── presentation/
-    ├── messaging/
-    │   ├── router.py
-    │   ├── kafka/
-    │   │   └── kafka_consumer.py
-    │   └── mqtt/
-    │       ├── mqtt_consumer.py
-    │       └── handlers/
-    │           └── register_device_message_handler.py
-    └── http/
-        ├── controllers/
-        ├── presenters/
-        ├── requests/
-        ├── responses/
-        └── routes/
+└── presentation/                              # entry points from external world
+    ├── http/
+    │   ├── controllers/
+    │   │   └── register_device_controller.py  # orchestrates request → use case → response
+    │   ├── middleware/
+    │   │   └── api_key_middleware.py           # X-API-Key validation
+    │   ├── presenters/
+    │   │   └── device_presenter.py            # output DTO → response schema
+    │   ├── requests/
+    │   │   └── register_device_request.py     # Pydantic input validation
+    │   ├── responses/
+    │   │   ├── register_device_response.py    # RegisterDeviceData schema
+    │   │   └── shared/
+    │   │       ├── base_response.py           # Response[T] envelope
+    │   │       ├── error_messages.py          # error code → human message map
+    │   │       └── response_helper.py         # http_response() builder
+    │   └── routes/
+    │       └── device_routes.py               # FastAPI APIRouter
+    └── messaging/
+        ├── router.py                          # MessageRouter (topic → handler)
+        └── mqtt/
+            └── handlers/
+                └── register_device_message_handler.py
 ```
-
----
-
-## Why This Template Scales
-
-- MQTT inbound is isolated in infrastructure and presentation.
-- Message routing is tiny and replaceable.
-- Use cases stay focused on application behavior.
-- Domain events describe what happened without knowing side effects.
-- Event handlers convert domain events into infrastructure actions.
-- UnitOfWork keeps transaction mechanics in infrastructure.
-- Bootstrap owns object wiring so application code never imports concrete adapters.
-
-This keeps the template clean for a larger project without hiding the runtime flow.
