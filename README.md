@@ -51,21 +51,6 @@ The system is composed of four strict layers.
 
 ---
 
-## Runtime Overview
-
-`main.py` starts two concurrent workers in a single process:
-
-```
-main.py
-  │
-  ├── Thread(daemon=True)
-  │     └── DeviceRuntimeRunner.run()   ← while True loop, publishes heartbeat
-  │
-  └── uvicorn.run(app)                  ← FastAPI HTTP server + MQTT listener
-```
-
----
-
 ## Flow 1 — HTTP Inbound → Controller → Use Case
 
 ```
