@@ -100,7 +100,7 @@ http_response(ParamHTTPResp)
   ▼
 Client receives:
   201 Created
-  {"status": "success", "data": {"device_id": "cam-01", "status": "active"}}
+  {"status": "success", "message": "Created", "data": {"device_id": "PC_GAMINGKU", "status": "active"}}
 
   400 Bad Request (if already registered)
   {"status": "error", "message": "Device already registered"}
