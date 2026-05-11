@@ -151,6 +151,17 @@ RegisterDeviceUseCase.execute(input_dto)     ← same use case as HTTP flow
 | `device/config` | *(extensible)* |
 | `device/publish` | *(extensible)* |
 
+### Key files
+
+| File | Role |
+|------|------|
+| `infrastructure/messaging/mqtt/mqtt_client.py` | paho-mqtt wrapper, fires `on_message` callback |
+| `presentation/messaging/router.py` | `MessageRouter` — registers and dispatches topic → handler |
+| `presentation/messaging/mqtt/handlers/register_device_message_handler.py` | Parses MQTT payload, calls scoped use case factory |
+| `presentation/messaging/mqtt/requests/register_device_request.py` | MQTT payload schema |
+| `bootstrap/message_router.py` | Wires handlers into the router at startup |
+| `application/usecase/register_device_usecase.py` | Same use case shared with HTTP flow |
+
 ---
 
 ## Flow 3 — Thread Runner → Event Bus → MQTT Outbound
@@ -193,6 +204,19 @@ MQTT Broker
 
 > The use case only knows `EventBus` — it never knows MQTT exists.  
 > Swapping MQTT for Kafka requires only changing the handler registration in `bootstrap/event_bus.py`.
+
+### Key files
+
+| File | Role |
+|------|------|
+| `infrastructure/runner/device_runtime_runner.py` | `while True` loop — creates scoped use case per iteration |
+| `application/usecase/send_device_online_usecase.py` | Creates `DeviceOnlineEvent` and publishes to `EventBus` |
+| `domain/events/device_online_event.py` | `DeviceOnlineEvent(device_id, timestamp)` — pure domain event |
+| `application/interfaces/messaging/event_bus.py` | `EventBus` ABC — `publish` and `subscribe` |
+| `infrastructure/messaging/event_bus/in_memory_event_bus.py` | Default event bus impl — dispatches to subscribed handlers |
+| `infrastructure/event_handlers/mqtt_send_device_online_handler.py` | Translates `DeviceOnlineEvent` → MQTT publish |
+| `infrastructure/messaging/mqtt/messages/device_online_message.py` | MQTT payload DTO |
+| `bootstrap/event_bus.py` | Wires `DeviceOnlineEvent` → `MQTTSendDeviceOnlineHandler` at startup |
 
 ---
 
