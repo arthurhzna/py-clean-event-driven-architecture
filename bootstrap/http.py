@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from bootstrap.container import ApplicationContainer
 from config.http import HttpServerConfig
+from presentation.http.exception_handlers.global_exception_handler import global_exception_handler
 from presentation.http.middleware.api_key_middleware import ApiKeyMiddleware
 from bootstrap.http_router import register_http_routes
 
@@ -14,6 +15,11 @@ def build_fastapi_app(
 ) -> FastAPI:
 
     app = FastAPI()
+
+    app.add_exception_handler(
+        Exception,
+        global_exception_handler,
+    )
 
     app.add_middleware(
         ApiKeyMiddleware,

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from domain.ports.messaging.event_bus import (
-    BaseEventBus,
+from application.interfaces.messaging.event_bus import (
+    EventBus,
     EventHandler,
 )
 
-class InMemoryEventBus(BaseEventBus):
+class InMemoryEventBus(EventBus):
     def __init__(self) -> None:
         self._handlers: dict[type, list[EventHandler]] = defaultdict[type, list[EventHandler]](list)
 

@@ -2,8 +2,16 @@ from presentation.http.errors.auth_error import (
     AuthError,
 )
 
+from presentation.http.errors.system_error import (
+    SystemError,
+)
+
 from domain.errors.device_error import (
     DeviceError,
+)
+
+from presentation.http.responses.shared.response_constants import (
+    INTERNAL_SERVER_ERROR,
 )
 
 
@@ -13,6 +21,11 @@ ERROR_MAP: dict[str, str] = {
     .DEVICE_NOT_FOUND
     .value:
         "Device not found",
+
+    SystemError
+    .INTERNAL_SERVER_ERROR
+    .value:
+        "Internal server error",
 
     DeviceError
     .DEVICE_ALREADY_REGISTERED
@@ -28,4 +41,5 @@ ERROR_MAP: dict[str, str] = {
     .INVALID_CREDENTIALS
     .value:
         "Invalid credentials",
+
 }

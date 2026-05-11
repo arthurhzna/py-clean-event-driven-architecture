@@ -5,7 +5,7 @@ from datetime import (
     datetime,
 )
 
-from application.interface.persistence.unit_of_work import (
+from application.interfaces.persistence.unit_of_work import (
     UnitOfWork,
 )
 
@@ -13,8 +13,8 @@ from domain.events.device_online_event import (
     DeviceOnlineEvent,
 )
 
-from domain.ports.messaging.event_bus import (
-    BaseEventBus,
+from application.interfaces.messaging.event_bus import (
+    EventBus,
 )
 
 
@@ -22,7 +22,7 @@ class SendDeviceOnlineUseCase:
     def __init__(
         self,
         uow: UnitOfWork,
-        event_bus: BaseEventBus,
+        event_bus: EventBus,
     ) -> None:
 
         self._uow = uow

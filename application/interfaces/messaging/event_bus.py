@@ -7,7 +7,7 @@ from typing import Any
 EventHandler = Callable[[Any], None]
 
 
-class BaseEventBus(ABC):
+class EventBus(ABC):
     @abstractmethod
     def publish(self, event: object) -> None:
         raise NotImplementedError

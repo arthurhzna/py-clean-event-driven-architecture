@@ -6,7 +6,7 @@ from application.dto.output.register_device_output import (
     RegisterDeviceOutput,
 )
 
-from application.interface.persistence.unit_of_work import (
+from application.interfaces.persistence.unit_of_work import (
     UnitOfWork,
 )
 
@@ -28,7 +28,7 @@ from domain.errors.device_error import (
     DeviceError,
 )
 
-from domain.ports.repositories.device_repository import (
+from application.interfaces.persistence.repositories.device_repository import (
     DeviceRepository,
 )
 

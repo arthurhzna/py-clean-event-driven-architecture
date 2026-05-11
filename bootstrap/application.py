@@ -54,7 +54,7 @@ from config.config import (
     load_config,
 )
 
-from infrastructure.event_bus.in_memory_event_bus import (
+from infrastructure.messaging.event_bus.in_memory_event_bus import (
     InMemoryEventBus,
 )
 

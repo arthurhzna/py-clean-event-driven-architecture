@@ -10,8 +10,8 @@ from application.state.state_manager import (
     StateManager,
 )
 
-from domain.interface.messaging.event_bus import (
-    BaseEventBus,
+from application.interfaces.messaging.event_bus import (
+    EventBus,
 )
 
 from infrastructure.messaging.mqtt.mqtt_client import (
@@ -23,5 +23,5 @@ from infrastructure.messaging.mqtt.mqtt_client import (
 class ApplicationContainer:
     pool: ThreadedConnectionPool
     state_manager: StateManager
-    event_bus: BaseEventBus
+    event_bus: EventBus
     mqtt_client: MqttClient
