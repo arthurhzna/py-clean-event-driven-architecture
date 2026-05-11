@@ -4,8 +4,8 @@
 
 # Python Clean Event-Driven Architecture
 
-A real-time device monitoring system built with **Clean Architecture** and **Event-Driven** principles.  
-The system exposes an HTTP API, connects to an MQTT broker, processes inbound device messages, and continuously publishes device heartbeat events — all running in a single process via threads.
+A template project for building scalable Python applications using **Clean Architecture** and **Event-Driven** principles.  
+This template demonstrates how to structure HTTP APIs, MQTT communication, background workers, domain events, and dependency injection in a clean and maintainable way — all running in a single process via threads.
 
 ---
 
