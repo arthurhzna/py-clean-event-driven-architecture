@@ -126,7 +126,7 @@ Client receives:
 MQTT Broker
   │
   │  topic: "device/register"
-  │  payload: {"device_id": "cam-01"}
+  │  payload: {"device_id": "PC_GAMINGKU"}
   ▼
 MqttClient.on_message(topic, payload)        ← infrastructure/messaging/mqtt/
   │  wired to router.dispatch at startup
