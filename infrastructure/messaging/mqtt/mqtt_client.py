@@ -85,7 +85,6 @@ class MqttClient:
                 )
 
             if self.on_connect:
-
                 self.on_connect(
                     client,
                     userdata,
@@ -177,7 +176,14 @@ class MqttClient:
             _cb_message
         )
 
-        client.connect(
+        # connect blocking way
+        # client.connect(
+        #     self._broker,
+        #     self._port,
+        #     keepalive=keepalive,
+        # )
+
+        client.connect_async(
             self._broker,
             self._port,
             keepalive=keepalive,
@@ -239,7 +245,10 @@ class MqttClient:
         qos: int = 0,
     ) -> None:
 
-        if self._paho is None:
+        if (
+            self._paho is None
+            or not self._connected
+        ):
 
             raise RuntimeError(
                 "MQTT client not connected",

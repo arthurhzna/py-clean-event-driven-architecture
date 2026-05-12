@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import traceback
-
-from http import HTTPStatus
-
 from fastapi import (
     Request,
 )
 
-from presentation.http.errors.system_error import (
-    SystemError,
+from presentation.http.exceptions.app_exception import (
+    AppException,
 )
 
 from presentation.http.responses.shared.response_helper import (
@@ -22,14 +18,19 @@ async def global_exception_handler(
     request: Request,
     exc: Exception,
 ):
-    # traceback.print_exc()
+
+    app_exception = AppException()
+
+    if isinstance(
+        exc,
+        AppException,
+    ):
+
+        app_exception = exc
 
     return http_response(
         ParamHTTPResp(
-            code=(
-                HTTPStatus
-                .INTERNAL_SERVER_ERROR
-            ),
-            err=SystemError.INTERNAL_SERVER_ERROR,
+            code=app_exception.code,
+            err=app_exception.err,
         )
     )

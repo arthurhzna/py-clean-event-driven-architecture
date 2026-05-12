@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dotenv import load_dotenv
+
 from dataclasses import (
     dataclass,
 )
@@ -30,6 +32,7 @@ from config.mqtt import (
     load_mqtt_config,
 )
 
+load_dotenv()
 
 @dataclass
 class Config:

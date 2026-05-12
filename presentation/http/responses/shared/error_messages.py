@@ -10,8 +10,8 @@ from domain.errors.device_error import (
     DeviceError,
 )
 
-from presentation.http.responses.shared.response_constants import (
-    INTERNAL_SERVER_ERROR,
+from presentation.http.errors.system_error import (
+    SystemError,
 )
 
 

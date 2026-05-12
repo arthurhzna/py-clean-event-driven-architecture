@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from fastapi import APIRouter
+from fastapi import Depends
 
 from application.usecase.register_device_usecase import (
     RegisterDeviceUseCase,
@@ -22,6 +24,7 @@ def make_device_router(
         [],
         RegisterDeviceUseCase,
     ],
+    api_key_auth: Callable[..., Any],
 ) -> APIRouter:
 
     router = APIRouter(
@@ -29,7 +32,12 @@ def make_device_router(
         tags=["devices"],
     )
 
-    @router.post("/register")
+    @router.post(
+        "/register",
+        dependencies=[
+            Depends(api_key_auth),
+        ],
+    )
     async def register_device(
         body: RegisterDeviceRequest,
     ):
