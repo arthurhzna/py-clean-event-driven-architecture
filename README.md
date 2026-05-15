@@ -4,9 +4,9 @@
 
 # Python Clean Event-Driven Architecture
 
-A scalable and high-performance Python backend template that combines Clean Architecture, event-driven communication, FastAPI, MQTT, and PostgreSQL in a modular and maintainable design.
+A scalable and high-performance Python template built with a modular and maintainable architecture.
 
-This template is designed to support projects ranging from small services to large-scale systems while maintaining clear boundaries, extensibility, and long-term maintainability.
+This template is designed to support a wide range of applications — from small services to large-scale systems — while maintaining clear boundaries, extensibility, and long-term maintainability.
 
 ## Runtime at a Glance
 
