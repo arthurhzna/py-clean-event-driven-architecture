@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./architecture.svg" alt="Clean Architecture Diagram" width="420"/>
+</p>
+
 # Python Clean Event-Driven Architecture
 
 A scalable and high-performance Python backend template that combines Clean Architecture, event-driven communication, FastAPI, MQTT, and PostgreSQL in a modular and maintainable design.
