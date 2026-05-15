@@ -8,21 +8,6 @@ A scalable and high-performance Python template built with a modular and maintai
 
 This template is designed to support a wide range of applications — from small services to large-scale systems — while maintaining clear boundaries, extensibility, and long-term maintainability.
 
-## Runtime at a Glance
-
-```text
-main.py
-  ├── build_application()
-  │     ├── load env-based config
-  │     ├── migrate + connect PostgreSQL
-  │     ├── create StateManager + InMemoryEventBus
-  │     ├── create MQTT client and subscriptions
-  │     ├── wire HTTP routes and message handlers
-  │     └── build DeviceRuntimeRunner
-  ├── start DeviceRuntimeRunner in a daemon thread
-  └── start Uvicorn / FastAPI
-```
-
 ## Architecture
 
 Dependencies point inward. The domain stays independent from frameworks and infrastructure.
