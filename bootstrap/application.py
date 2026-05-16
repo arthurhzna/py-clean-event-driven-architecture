@@ -37,7 +37,6 @@ from bootstrap.services import (
 )
 
 from bootstrap.usecase_factories.scoped_factories import (
-    build_register_device_usecase,
     build_send_device_online_usecase,
 )
 
@@ -109,11 +108,7 @@ def build_application() -> Application:
 
     register_message_handlers(
         router=router,
-        register_device_usecase_factory=(
-            lambda: build_register_device_usecase(
-                container=container,
-            )
-        ),
+        container=container,
     )
 
     mqtt_client.on_message = (

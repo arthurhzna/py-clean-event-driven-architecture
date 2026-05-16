@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import (
-    Callable,
+from bootstrap.container import (
+    ApplicationContainer,
 )
 
-from application.usecase.register_device_usecase import (
-    RegisterDeviceUseCase,
+from bootstrap.usecase_factories.scoped_factories import (
+    build_register_device_usecase,
 )
 
 from presentation.messaging.mqtt.handlers.register_device_message_handler import (
@@ -19,17 +19,16 @@ from presentation.messaging.router import (
 
 def register_message_handlers(
     router: MessageRouter,
-    register_device_usecase_factory: Callable[
-        [],
-        RegisterDeviceUseCase,
-    ],
+    container: ApplicationContainer,
 ) -> None:
 
     router.register(
         "device/register",
         RegisterDeviceMessageHandler(
             create_usecase=(
-                register_device_usecase_factory
+                lambda: build_register_device_usecase(
+                    container=container,
+                )
             ),
         ),
     )
