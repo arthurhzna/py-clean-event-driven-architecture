@@ -12,6 +12,10 @@ from presentation.messaging.router import (
     MessageRouter,
 )
 
+from presentation.messaging.mqtt.mqtt_consumer import (
+    MqttConsumer,
+)
+
 from bootstrap.container import (
     ApplicationContainer,
 )
