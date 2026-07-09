@@ -111,9 +111,11 @@ def build_application() -> Application:
         container=container,
     )
 
-    mqtt_client.on_message = (
-        router.dispatch
+    consumer = MqttConsumer(
+        on_message=router.dispatch,
     )
+
+    mqtt_client.on_message = consumer.handle
 
     mqtt_client.connect()
 
