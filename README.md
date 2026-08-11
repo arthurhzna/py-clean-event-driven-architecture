@@ -1,3 +1,5 @@
+
+
 <p align="center">
   <img src="./architecture.svg" alt="Clean Architecture Diagram" width="420"/>
 </p>
@@ -194,7 +196,7 @@ Configuration is loaded from `.env` via `python-dotenv`.
 
 ### 1. Install dependencies
 
-This repo includes `uv.lock`, so with `uv`:
+Ensure Python 3.9 or higher is installed. This repo includes `uv.lock`, so with `uv`:
 
 ```bash
 uv sync
@@ -271,4 +273,3 @@ uv run python main.py
 - `presentation/messaging/kafka/kafka_consumer.py` is also still a placeholder.
 - The active HTTP middleware is `LoggingMiddleware`; API-key auth is wired as a FastAPI dependency on the route.
 - `SendDeviceOnlineUseCase` receives a `UnitOfWork`, but it does not use it yet.
-
